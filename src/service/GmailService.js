@@ -40,7 +40,30 @@ async function sendRegistrationEmail(to, name) {
 
     await sendEmail(to, subject, text, html);
 }
+async function sendTransactionEmail(to, name, transactionDetails) {
+    const subject = 'Transaction Notification';
+    const text = `Hi ${name},\n\nYour transaction has been processed successfully. Here are the details:\n\n${transactionDetails}\n\nBest regards,\nThe Team`;
+    const html = `
+        <p>Hi ${name},</p>
+        <p>Your transaction has been processed successfully. Here are the details:</p>
+        <p>${transactionDetails}</p>
+        <p>Best regards,<br>The Team</p>
+    `;
 
+    await sendEmail(to, subject, text, html);
+}
+async function failureNotificationEmail(to, name, errorDetails) {
+    const subject = 'Transaction Failure Notification';
+    const text = `Hi ${name},\n\nWe regret to inform you that your recent transaction could not be processed. Here are the details:\n\n${errorDetails}\n\nPlease contact support for further assistance.\n\nBest regards,\nThe Team`;
+    const html = `
+        <p>Hi ${name},</p>
+        <p>We regret to inform you that your recent transaction could not be processed. Here are the details:</p>   
+    <p>${errorDetails}</p>
+        <p>Please contact support for further assistance.</p>
+        <p>Best regards,<br>The Team</p>
+    `;
+    await sendEmail(to, subject, text, html);
+}
 
 // Verify the connection configuration
 transporter.verify((error, success) => {
@@ -50,7 +73,7 @@ transporter.verify((error, success) => {
         console.log('Email server is ready to send messages');
     }
 });
-module.exports = { sendEmail, sendRegistrationEmail };
+module.exports = { sendEmail, sendRegistrationEmail, sendTransactionEmail };
 
 
 module.exports = transporter;

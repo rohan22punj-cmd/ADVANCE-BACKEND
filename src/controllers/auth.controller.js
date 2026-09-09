@@ -1,6 +1,6 @@
 const userModel = require('../models/user.model');
 const jwt = require('jsonwebtoken');
-const ewmailService = require('../service/GmailService');
+const emailService = require('../service/GmailService');
 
 async function userRegisterController(req, res) {
     const { email, name, password } = req.body;
@@ -13,7 +13,9 @@ async function userRegisterController(req, res) {
 
         const user = await userModel.create({ email, name, password });
 
-        const token = jwt.sign({ userId: user._id }, process.env.jwt_secret, {
+        await emailService.sendRegistrationEmail(email, name);
+
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
             expiresIn: '1h'
         });
 
@@ -49,7 +51,7 @@ async function userLoginController(req, res) {
             return res.status(401).json({ message: 'Invalid password' });
         }
 
-        const token = jwt.sign({ userId: user._id }, process.env.jwt_secret, {
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
             expiresIn: '1h'
         });
 
@@ -70,10 +72,8 @@ async function userLoginController(req, res) {
         return res.status(500).json({ message: error.message || 'Something went wrong' });
     }
 }
-await emailService.sendRegistrationEmail(email, name);
 
 module.exports = {
     userRegisterController,
-    userLoginController,
-    userReegisterController: userRegisterController
+    userLoginController
 };

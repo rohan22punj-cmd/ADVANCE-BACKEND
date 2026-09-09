@@ -9,7 +9,7 @@ async function authMiddleware(req, res, next) {
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await userModel.findById(decoded.id);
+        const user = await userModel.findById(decoded.userId);
         if (!user) {
             return res.status(401).json({ message: 'Unauthorized: Invalid token' });
         }
@@ -24,7 +24,7 @@ async function authSystemUserMiddleware(req, res, next) {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await userModel.findById(decoded.id);
+        const user = await userModel.findById(decoded.userId);
         if (!user || !user.systemUser) {
             return res.status(403).json({ message: 'Forbidden: Access denied for non-system users' });
         }

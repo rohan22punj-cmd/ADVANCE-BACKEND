@@ -73,7 +73,4 @@ transporter.verify((error, success) => {
         console.log('Email server is ready to send messages');
     }
 });
-module.exports = { sendEmail, sendRegistrationEmail, sendTransactionEmail };
-
-
-module.exports = transporter;
+module.exports = { sendEmail, sendRegistrationEmail, sendTransactionEmail, failureNotificationEmail };

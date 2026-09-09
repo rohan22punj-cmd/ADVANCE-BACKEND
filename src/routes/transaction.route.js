@@ -1,8 +1,9 @@
-const router = require('express').Router();
-const trasactionRouter = require('./transaction.route');
+const express = require('express');
+const router = express.Router();
+const { authMiddleware, authSystemUserMiddleware } = require('../middleware/auth.middleware');
+const transactionController = require('../controllers/transactionController');
 
+router.post('/', authMiddleware, transactionController.createTransaction);
+router.post('/initial', authSystemUserMiddleware, transactionController.createInitialfundsTransaction);
 
-transactionRouter.post("/", authMiddleware, async(req, res) => {
-    // Implementation for creating a new transaction
-});
-module.exports = transactionRouter;
+module.exports = router;

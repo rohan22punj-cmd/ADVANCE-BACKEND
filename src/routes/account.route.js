@@ -1,11 +1,10 @@
 const express = require('express');
-const authmiddleware = require('../middleware/auth.middleware');
-
-
 const router = express.Router();
+const { authMiddleware } = require('../middleware/auth.middleware');
+const accountController = require('../controllers/account.controller');
 
-router.post("/", authmiddleware.authmiddleware, accountController.createAccount);
+router.post('/', authMiddleware, accountController.createAccount);
+router.get('/', authMiddleware, accountController.getAccounts);
+router.get('/:accountId', authMiddleware, accountController.getAccountBalanceController);
 
-router.get("/", authmiddleware.authmiddleware, accountController.getAccounts);
-router.get("/:accountId", authmiddleware.authmiddleware, accountController.getAccountById);
 module.exports = router;

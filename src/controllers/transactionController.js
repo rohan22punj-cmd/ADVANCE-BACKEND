@@ -278,7 +278,108 @@ async function createInitialfundsTransaction(req, res) {
     }
 }
 
+/**
+ * Get Transaction History with Pagination and Filtering
+ * Returns paginated list of transactions for the authenticated user's accounts
+ */
+async function getTransactionHistory(req, res) {
+    try {
+        const { page, limit, status, startDate, endDate, accountId } = req.query;
+
+        // Get all accounts owned by the authenticated user
+        const userAccounts = await accountModel.find({ user: req.user._id }).select('_id');
+        const userAccountIds = userAccounts.map(acc => acc._id);
+
+        if (userAccountIds.length === 0) {
+            return res.status(200).json({
+                transactions: [],
+                pagination: {
+                    page: page || 1,
+                    limit: limit || 10,
+                    total: 0,
+                    totalPages: 0
+                }
+            });
+        }
+
+        // Build query filter
+        const filter = {
+            $or: [
+                { fromAccount: { $in: userAccountIds } },
+                { toAccount: { $in: userAccountIds } }
+            ]
+        };
+
+        // Filter by specific account if provided
+        if (accountId && mongoose.Types.ObjectId.isValid(accountId)) {
+            // Check if this account belongs to the user
+            if (!userAccountIds.some(id => id.toString() === accountId)) {
+                return res.status(403).json({ message: 'Access denied to this account' });
+            }
+            filter.$or = [
+                { fromAccount: new mongoose.Types.ObjectId(accountId) },
+                { toAccount: new mongoose.Types.ObjectId(accountId) }
+            ];
+        }
+
+        // Filter by status if provided
+        if (status) {
+            filter.status = status;
+        }
+
+        // Filter by date range if provided
+        if (startDate || endDate) {
+            filter.createdAt = {};
+            if (startDate) {
+                filter.createdAt.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                // Add one day to include the entire end date
+                const endDateTime = new Date(endDate);
+                endDateTime.setDate(endDateTime.getDate() + 1);
+                filter.createdAt.$lt = endDateTime;
+            }
+        }
+
+        // Calculate pagination
+        const skip = (page - 1) * limit;
+
+        // Execute query with pagination
+        const [transactions, totalCount] = await Promise.all([
+            transactionModel
+                .find(filter)
+                .populate('fromAccount', 'currency status')
+                .populate('toAccount', 'currency status')
+                .sort({ createdAt: -1 }) // Most recent first
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            transactionModel.countDocuments(filter)
+        ]);
+
+        const totalPages = Math.ceil(totalCount / limit);
+
+        return res.status(200).json({
+            transactions,
+            pagination: {
+                page,
+                limit,
+                total: totalCount,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1
+            }
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message || "Failed to retrieve transaction history"
+        });
+    }
+}
+
 module.exports = {
     createTransaction,
-    createInitialfundsTransaction
+    createInitialfundsTransaction,
+    getTransactionHistory
 };

@@ -7,7 +7,8 @@ const {
     validateQuery,
     createTransactionSchema,
     initialFundsSchema,
-    transactionQuerySchema
+    transactionQuerySchema,
+    reverseTransactionSchema
 } = require('../middleware/validate.middleware');
 
 // User-to-user transfer
@@ -18,5 +19,8 @@ router.post('/initial', authSystemUserMiddleware, validateBody(initialFundsSchem
 
 // Transaction history with pagination and filtering
 router.get('/', authMiddleware, validateQuery(transactionQuerySchema), transactionController.getTransactionHistory);
+
+// Reverse a completed transaction
+router.post('/:transactionId/reverse', authMiddleware, validateBody(reverseTransactionSchema), transactionController.reverseTransaction);
 
 module.exports = router;

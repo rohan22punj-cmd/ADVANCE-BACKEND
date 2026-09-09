@@ -106,6 +106,15 @@ async function createTransaction(req, res) {
         const currentBalance = balanceAgg.length > 0 ? balanceAgg[0].balance : 0;
 
         if (currentBalance < numericAmount) {
+            // Send failure notification email
+            if (fromAccount.user?.email) {
+                emailService.failureNotificationEmail(
+                    fromAccount.user.email,
+                    fromAccount.user.name,
+                    `Insufficient funds. You attempted to send ${numericAmount} ${fromAccount.currency} but your current balance is ${currentBalance} ${fromAccount.currency}.`
+                ).catch(err => console.error("Failure email failed:", err.message));
+            }
+
             return res.status(400).json({
                 message: "Insufficient funds",
                 currentBalance,
@@ -174,6 +183,16 @@ async function createTransaction(req, res) {
             // Roll back all writes made in this session if anything fails
             await session.abortTransaction();
             session.endSession();
+
+            // Send failure notification email
+            if (fromAccount.user?.email) {
+                emailService.failureNotificationEmail(
+                    fromAccount.user.email,
+                    fromAccount.user.name,
+                    `Transaction failed: ${error.message}. Amount: ${numericAmount} ${fromAccount.currency}. Please contact support if this issue persists.`
+                ).catch(err => console.error("Failure email failed:", err.message));
+            }
+
             throw error;
         }
 
@@ -378,8 +397,175 @@ async function getTransactionHistory(req, res) {
     }
 }
 
+/**
+ * Reverse a Completed Transaction
+ * Creates offsetting ledger entries to reverse a completed transaction
+ */
+async function reverseTransaction(req, res) {
+    const { transactionId } = req.params;
+    const { reason, idempotencyKey } = req.body;
+
+    try {
+        // Validate transaction ID format
+        if (!mongoose.Types.ObjectId.isValid(transactionId)) {
+            return res.status(400).json({ message: "Invalid transaction ID format" });
+        }
+
+        // Check for duplicate reversal idempotency key
+        const existingReversal = await transactionModel.findOne({ idempotencyKey });
+        if (existingReversal) {
+            return res.status(409).json({
+                message: "Reversal already processed with this idempotency key",
+                transaction: existingReversal
+            });
+        }
+
+        // Find the original transaction
+        const originalTransaction = await transactionModel.findById(transactionId)
+            .populate('fromAccount')
+            .populate('toAccount');
+
+        if (!originalTransaction) {
+            return res.status(404).json({ message: "Transaction not found" });
+        }
+
+        // Authorization: User must be the sender OR a system user
+        const isAuthorized =
+            originalTransaction.fromAccount.user.toString() === req.user._id.toString() ||
+            req.user.systemUser === true;
+
+        if (!isAuthorized) {
+            return res.status(403).json({
+                message: "Forbidden: You can only reverse transactions you initiated"
+            });
+        }
+
+        // Validate transaction status
+        if (originalTransaction.status !== 'completed') {
+            return res.status(400).json({
+                message: `Cannot reverse transaction with status '${originalTransaction.status}'. Only 'completed' transactions can be reversed.`
+            });
+        }
+
+        // Populate full account details with user info
+        await originalTransaction.fromAccount.populate('user', 'name email');
+        await originalTransaction.toAccount.populate('user', 'name email');
+
+        // Check if destination account (who received funds) has sufficient balance to be debited
+        const balanceAgg = await ledgerModel.aggregate([
+            { $match: { account: originalTransaction.toAccount._id } },
+            {
+                $group: {
+                    _id: null,
+                    balance: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ["$type", "credit"] },
+                                "$amount",
+                                { $multiply: ["$amount", -1] }
+                            ]
+                        }
+                    }
+                }
+            }
+        ]);
+
+        const currentBalance = balanceAgg.length > 0 ? balanceAgg[0].balance : 0;
+
+        if (currentBalance < originalTransaction.amount) {
+            return res.status(400).json({
+                message: "Cannot reverse: destination account has insufficient funds for reversal",
+                requiredAmount: originalTransaction.amount,
+                currentBalance,
+                currency: originalTransaction.toAccount.currency
+            });
+        }
+
+        // Start ACID Transaction for Reversal
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        try {
+            // Create reversal transaction record
+            const reversalDocs = await transactionModel.create([{
+                fromAccount: originalTransaction.toAccount._id,  // Reversed direction
+                toAccount: originalTransaction.fromAccount._id,  // Reversed direction
+                status: "pending",
+                amount: originalTransaction.amount,
+                idempotencyKey,
+            }], { session });
+
+            const reversalTransaction = reversalDocs[0];
+
+            // Create offsetting ledger entries
+            // Debit the account that originally received funds
+            await ledgerModel.create([{
+                account: originalTransaction.toAccount._id,
+                amount: originalTransaction.amount,
+                transaction: reversalTransaction._id,
+                type: 'debit',
+            }], { session });
+
+            // Credit the account that originally sent funds
+            await ledgerModel.create([{
+                account: originalTransaction.fromAccount._id,
+                amount: originalTransaction.amount,
+                transaction: reversalTransaction._id,
+                type: 'credit',
+            }], { session });
+
+            // Mark reversal transaction as completed
+            reversalTransaction.status = 'completed';
+            await reversalTransaction.save({ session });
+
+            // Mark original transaction as reversed
+            originalTransaction.status = 'reversed';
+            await originalTransaction.save({ session });
+
+            // Commit the reversal
+            await session.commitTransaction();
+            session.endSession();
+
+            // Send email notifications
+            if (originalTransaction.fromAccount.user?.email) {
+                emailService.sendTransactionEmail(
+                    originalTransaction.fromAccount.user.email,
+                    originalTransaction.fromAccount.user.name,
+                    `Transaction reversed: ${originalTransaction.amount} ${originalTransaction.fromAccount.currency} has been returned to your account. Reason: ${reason}. Reversal ID: ${reversalTransaction._id}`
+                ).catch(err => console.error("Reversal email failed:", err.message));
+            }
+
+            if (originalTransaction.toAccount.user?.email) {
+                emailService.sendTransactionEmail(
+                    originalTransaction.toAccount.user.email,
+                    originalTransaction.toAccount.user.name,
+                    `Transaction reversed: ${originalTransaction.amount} ${originalTransaction.toAccount.currency} has been debited from your account. Reason: ${reason}. Reversal ID: ${reversalTransaction._id}`
+                ).catch(err => console.error("Reversal email failed:", err.message));
+            }
+
+            return res.status(201).json({
+                message: "Transaction reversed successfully",
+                originalTransaction,
+                reversalTransaction,
+                reason
+            });
+
+        } catch (error) {
+            await session.abortTransaction();
+            session.endSession();
+            throw error;
+        }
+
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message || "Transaction reversal failed"
+        });
+    }
+}
+
 module.exports = {
     createTransaction,
     createInitialfundsTransaction,
-    getTransactionHistory
+    getTransactionHistory,
+    reverseTransaction
 };

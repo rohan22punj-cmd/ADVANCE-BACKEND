@@ -5,5 +5,7 @@ const { validateBody, registerSchema, loginSchema } = require('../middleware/val
 
 router.post('/register', validateBody(registerSchema), authController.userRegisterController);
 router.post('/login', validateBody(loginSchema), authController.userLoginController);
+router.post('/refresh-token', authController.refreshTokenController);
+router.post('/logout', authController.logoutController);
 
 module.exports = router;

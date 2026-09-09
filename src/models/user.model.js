@@ -27,9 +27,20 @@ const userSchema = new mongoose.Schema({
         default: false,
         immutable: true // Once set, this field cannot be changed
 
-    }
+    },
+    refreshTokens: [{
+        token: {
+            type: String,
+            required: true
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now,
+            expires: 7 * 24 * 60 * 60 // Expire after 7 days
+        }
+    }]
 }, {
-    timestamps: true // Automatically adds createdAt and updatedAt fields   
+    timestamps: true // Automatically adds createdAt and updatedAt fields
 });
 
 userSchema.pre('save', async function(next) {

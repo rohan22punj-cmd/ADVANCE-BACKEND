@@ -70,6 +70,19 @@ const initialFundsSchema = z.object({
         .trim()
 });
 
+// Schema for Transaction Reversal
+const reverseTransactionSchema = z.object({
+    reason: z
+        .string({ required_error: 'Reversal reason is required' })
+        .min(5, 'Reason must be at least 5 characters long')
+        .max(255, 'Reason cannot exceed 255 characters')
+        .trim(),
+    idempotencyKey: z
+        .string({ required_error: 'idempotencyKey is required' })
+        .min(8, 'idempotencyKey must be at least 8 characters long')
+        .trim()
+});
+
 // Query Schema for Transaction History
 const transactionQuerySchema = z.object({
     page: z.coerce.number().int().positive().default(1),
@@ -134,6 +147,7 @@ module.exports = {
     createAccountSchema,
     createTransactionSchema,
     initialFundsSchema,
+    reverseTransactionSchema,
     transactionQuerySchema,
     validateBody,
     validateQuery

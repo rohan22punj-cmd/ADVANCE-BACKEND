@@ -22,7 +22,7 @@ function generateRefreshToken() {
 /**
  * User Registration
  */
-async function userRegisterController(req, res) {
+async function userRegisterController(req, res, next) {
     const { email, name, password } = req.body;
 
     try {
@@ -34,9 +34,7 @@ async function userRegisterController(req, res) {
         const user = await userModel.create({ email, name, password });
 
         // Send welcome email asynchronously
-        emailService.sendRegistrationEmail(email, name).catch(err =>
-            console.error("Registration email failed:", err.message)
-        );
+        void emailService.sendRegistrationEmail(email, name);
 
         // Generate tokens
         const accessToken = generateAccessToken(user._id);
@@ -69,14 +67,14 @@ async function userRegisterController(req, res) {
             refreshToken
         });
     } catch (error) {
-        return res.status(500).json({ message: error.message || 'Something went wrong' });
+        next(error);
     }
 }
 
 /**
  * User Login
  */
-async function userLoginController(req, res) {
+async function userLoginController(req, res, next) {
     const { email, password } = req.body;
 
     try {
@@ -121,14 +119,14 @@ async function userLoginController(req, res) {
             refreshToken
         });
     } catch (error) {
-        return res.status(500).json({ message: error.message || 'Something went wrong' });
+        next(error);
     }
 }
 
 /**
  * Refresh Access Token using Refresh Token
  */
-async function refreshTokenController(req, res) {
+async function refreshTokenController(req, res, next) {
     const { refreshToken } = req.cookies;
 
     if (!refreshToken) {
@@ -160,14 +158,14 @@ async function refreshTokenController(req, res) {
             message: 'Access token refreshed successfully'
         });
     } catch (error) {
-        return res.status(500).json({ message: error.message || 'Token refresh failed' });
+        next(error);
     }
 }
 
 /**
  * Logout - Invalidate Refresh Token
  */
-async function logoutController(req, res) {
+async function logoutController(req, res, next) {
     const { refreshToken } = req.cookies;
 
     try {
@@ -185,7 +183,7 @@ async function logoutController(req, res) {
 
         return res.status(200).json({ message: 'Logged out successfully' });
     } catch (error) {
-        return res.status(500).json({ message: error.message || 'Logout failed' });
+        next(error);
     }
 }
 

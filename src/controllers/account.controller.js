@@ -1,30 +1,27 @@
 const accountModel = require('../models/account.model');
 const ledgerModel = require('../models/ledger.model');
 
-async function createAccount(req, res) {
+async function createAccount(req, res, next) {
     try {
         const user = req.user;
         const account = await accountModel.create({ user: user._id, ...req.body });
         res.status(201).json({ message: 'Account created successfully', account });
     } catch (error) {
-        if (error.code === 11000) {
-            return res.status(409).json({ message: 'Account with this currency already exists for user' });
-        }
-        res.status(500).json({ message: error.message || 'Error creating account' });
+        next(error);
     }
 }
 
-async function getAccounts(req, res) {
+async function getAccounts(req, res, next) {
     try {
         const user = req.user;
         const accounts = await accountModel.find({ user: user._id });
         res.status(200).json({ accounts });
     } catch (error) {
-        res.status(500).json({ message: error.message || 'Error fetching accounts' });
+        next(error);
     }
 }
 
-async function getAccountBalanceController(req, res) {
+async function getAccountBalanceController(req, res, next) {
     const accountId = req.params.accountId;
 
     try {
@@ -65,7 +62,7 @@ async function getAccountBalanceController(req, res) {
             balance
         });
     } catch (error) {
-        res.status(500).json({ message: error.message || 'Error fetching account balance' });
+        next(error);
     }
 }
 

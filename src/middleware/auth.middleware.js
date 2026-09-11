@@ -1,43 +1,48 @@
 const userModel = require('../models/user.model');
 const jwt = require('jsonwebtoken');
+const { AppError } = require('./error.middleware');
 
 
 async function authMiddleware(req, res, next) {
     const token = req.cookies.accessToken || req.headers.authorization?.split(' ')[1];
     if (!token) {
-        return res.status(401).json({ message: 'Unauthorized: No access token provided' });
+        return next(new AppError('Unauthorized: No access token provided', 401));
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await userModel.findById(decoded.userId);
         if (!user) {
-            return res.status(401).json({ message: 'Unauthorized: Invalid token' });
+            return next(new AppError('Unauthorized: Invalid token', 401));
         }
         req.user = user;
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'Access token expired. Use /api/auth/refresh-token to get a new one.' });
+            return next(new AppError('Access token expired. Use /api/auth/refresh-token to get a new one.', 401));
         }
-        return res.status(401).json({ message: 'Unauthorized: Invalid token' });
+        next(error);
     }
 }
 async function authSystemUserMiddleware(req, res, next) {
     const token = req.cookies.accessToken || req.headers.authorization?.split(' ')[1];
 
+    if (!token) {
+        return next(new AppError('Unauthorized: No access token provided', 401));
+    }
+
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await userModel.findById(decoded.userId);
         if (!user || !user.systemUser) {
-            return res.status(403).json({ message: 'Forbidden: Access denied for non-system users' });
+            return next(new AppError('Forbidden: Access denied for non-system users', 403));
         }
         req.user = user;
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'Access token expired. Use /api/auth/refresh-token to get a new one.' });
+            return next(new AppError('Access token expired. Use /api/auth/refresh-token to get a new one.', 401));
         }
-        return res.status(401).json({ message: 'Unauthorized: Invalid token' });
+        next(error);
     }
 }
 

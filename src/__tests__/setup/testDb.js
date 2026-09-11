@@ -1,46 +1,23 @@
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
-
-// Load test environment variables
-require('dotenv').config({ path: '.env.test' });
 
 let mongoServer;
 
-/**
- * Connect to the in-memory database before all tests
- */
 async function connect() {
-    // Close any existing connections
     await mongoose.disconnect();
-
-    mongoServer = await MongoMemoryServer.create();
-    const uri = mongoServer.getUri();
-
-    await mongoose.connect(uri);
+    mongoServer = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+    await mongoose.connect(mongoServer.getUri());
 }
 
-/**
- * Drop all collections and clear data after each test
- */
 async function clearDatabase() {
-    const collections = mongoose.connection.collections;
-    for (const key in collections) {
-        await collections[key].deleteMany({});
+    for (const collection of Object.values(mongoose.connection.collections)) {
+        await collection.deleteMany({});
     }
 }
 
-/**
- * Close database connection and stop the in-memory server after all tests
- */
 async function closeDatabase() {
     await mongoose.disconnect();
-    if (mongoServer) {
-        await mongoServer.stop();
-    }
+    await mongoServer?.stop();
 }
 
-module.exports = {
-    connect,
-    clearDatabase,
-    closeDatabase
-};
+module.exports = { connect, clearDatabase, closeDatabase };

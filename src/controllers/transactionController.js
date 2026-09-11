@@ -4,11 +4,15 @@ const accountModel = require("../models/account.model");
 const mongoose = require("mongoose");
 const emailService = require("../service/GmailService");
 
+function notify(send) {
+    Promise.resolve().then(send).catch(() => undefined);
+}
+
 /**
  * Account-to-Account Money Transfer
  * Executes a double-entry financial transfer within an ACID MongoDB session
  */
-async function createTransaction(req, res) {
+async function createTransaction(req, res, next) {
     const { fromAccountId, toAccountId, amount, idempotencyKey } = req.body;
 
     try {
@@ -108,11 +112,11 @@ async function createTransaction(req, res) {
         if (currentBalance < numericAmount) {
             // Send failure notification email
             if (fromAccount.user?.email) {
-                emailService.failureNotificationEmail(
+                notify(() => emailService.failureNotificationEmail(
                     fromAccount.user.email,
                     fromAccount.user.name,
                     `Insufficient funds. You attempted to send ${numericAmount} ${fromAccount.currency} but your current balance is ${currentBalance} ${fromAccount.currency}.`
-                ).catch(err => console.error("Failure email failed:", err.message));
+                ));
             }
 
             return res.status(400).json({
@@ -167,11 +171,11 @@ async function createTransaction(req, res) {
 
             // Step F: Send email notification asynchronously (non-blocking)
             if (fromAccount.user?.email) {
-                emailService.sendTransactionEmail(
+                notify(() => emailService.sendTransactionEmail(
                     fromAccount.user.email,
                     fromAccount.user.name,
                     `Sent ${numericAmount} ${fromAccount.currency} to account ${toAccount._id}. Transaction ID: ${transaction._id}`
-                ).catch(err => console.error("Email notification failed:", err.message));
+                ));
             }
 
             return res.status(201).json({
@@ -186,20 +190,18 @@ async function createTransaction(req, res) {
 
             // Send failure notification email
             if (fromAccount.user?.email) {
-                emailService.failureNotificationEmail(
+                notify(() => emailService.failureNotificationEmail(
                     fromAccount.user.email,
                     fromAccount.user.name,
                     `Transaction failed: ${error.message}. Amount: ${numericAmount} ${fromAccount.currency}. Please contact support if this issue persists.`
-                ).catch(err => console.error("Failure email failed:", err.message));
+                ));
             }
 
             throw error;
         }
 
     } catch (error) {
-        return res.status(500).json({
-            message: error.message || "Transaction failed"
-        });
+        next(error);
     }
 }
 
@@ -207,7 +209,7 @@ async function createTransaction(req, res) {
  * System User Initial Funds Injection
  * Injects initial funds from a system user into any user account
  */
-async function createInitialfundsTransaction(req, res) {
+async function createInitialfundsTransaction(req, res, next) {
     const { toAccountId, amount, idempotencyKey } = req.body;
 
     try {
@@ -291,9 +293,7 @@ async function createInitialfundsTransaction(req, res) {
             throw error;
         }
     } catch (error) {
-        return res.status(500).json({
-            message: error.message || "Initial funds transaction failed"
-        });
+        next(error);
     }
 }
 
@@ -301,7 +301,7 @@ async function createInitialfundsTransaction(req, res) {
  * Get Transaction History with Pagination and Filtering
  * Returns paginated list of transactions for the authenticated user's accounts
  */
-async function getTransactionHistory(req, res) {
+async function getTransactionHistory(req, res, next) {
     try {
         const { page, limit, status, startDate, endDate, accountId } = req.query;
 
@@ -391,9 +391,7 @@ async function getTransactionHistory(req, res) {
         });
 
     } catch (error) {
-        return res.status(500).json({
-            message: error.message || "Failed to retrieve transaction history"
-        });
+        next(error);
     }
 }
 
@@ -401,7 +399,7 @@ async function getTransactionHistory(req, res) {
  * Reverse a Completed Transaction
  * Creates offsetting ledger entries to reverse a completed transaction
  */
-async function reverseTransaction(req, res) {
+async function reverseTransaction(req, res, next) {
     const { transactionId } = req.params;
     const { reason, idempotencyKey } = req.body;
 
@@ -528,19 +526,19 @@ async function reverseTransaction(req, res) {
 
             // Send email notifications
             if (originalTransaction.fromAccount.user?.email) {
-                emailService.sendTransactionEmail(
+                notify(() => emailService.sendTransactionEmail(
                     originalTransaction.fromAccount.user.email,
                     originalTransaction.fromAccount.user.name,
                     `Transaction reversed: ${originalTransaction.amount} ${originalTransaction.fromAccount.currency} has been returned to your account. Reason: ${reason}. Reversal ID: ${reversalTransaction._id}`
-                ).catch(err => console.error("Reversal email failed:", err.message));
+                ));
             }
 
             if (originalTransaction.toAccount.user?.email) {
-                emailService.sendTransactionEmail(
+                notify(() => emailService.sendTransactionEmail(
                     originalTransaction.toAccount.user.email,
                     originalTransaction.toAccount.user.name,
                     `Transaction reversed: ${originalTransaction.amount} ${originalTransaction.toAccount.currency} has been debited from your account. Reason: ${reason}. Reversal ID: ${reversalTransaction._id}`
-                ).catch(err => console.error("Reversal email failed:", err.message));
+                ));
             }
 
             return res.status(201).json({
@@ -557,9 +555,7 @@ async function reverseTransaction(req, res) {
         }
 
     } catch (error) {
-        return res.status(500).json({
-            message: error.message || "Transaction reversal failed"
-        });
+        next(error);
     }
 }
 

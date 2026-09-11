@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { AppError } = require('./error.middleware');
 
 // Schema for User Registration
 const registerSchema = z.object({
@@ -98,22 +99,16 @@ const transactionQuerySchema = z.object({
  */
 function validateBody(schema) {
     return (req, res, next) => {
-        try {
-            req.body = schema.parse(req.body);
-            next();
-        } catch (error) {
-            if (error instanceof z.ZodError) {
-                const errors = error.issues.map(issue => ({
-                    field: issue.path.join('.'),
-                    message: issue.message
-                }));
-                return res.status(400).json({
-                    message: 'Validation failed',
-                    errors
-                });
-            }
-            return res.status(400).json({ message: 'Invalid request payload' });
+        const result = schema.safeParse(req.body);
+        if (!result.success) {
+            const errors = result.error.issues.map(issue => ({
+                field: issue.path.join('.'),
+                message: issue.message
+            }));
+            return next(new AppError('Validation failed', 400, errors));
         }
+        req.body = result.data;
+        next();
     };
 }
 
@@ -122,22 +117,16 @@ function validateBody(schema) {
  */
 function validateQuery(schema) {
     return (req, res, next) => {
-        try {
-            req.query = schema.parse(req.query);
-            next();
-        } catch (error) {
-            if (error instanceof z.ZodError) {
-                const errors = error.issues.map(issue => ({
-                    field: issue.path.join('.'),
-                    message: issue.message
-                }));
-                return res.status(400).json({
-                    message: 'Query parameter validation failed',
-                    errors
-                });
-            }
-            return res.status(400).json({ message: 'Invalid query parameters' });
+        const result = schema.safeParse(req.query);
+        if (!result.success) {
+            const errors = result.error.issues.map(issue => ({
+                field: issue.path.join('.'),
+                message: issue.message
+            }));
+            return next(new AppError('Query parameter validation failed', 400, errors));
         }
+        req.query = result.data;
+        next();
     };
 }
 

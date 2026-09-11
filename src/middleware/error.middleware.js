@@ -28,6 +28,10 @@ function notFoundHandler(req, res, next) {
  * Catches all errors passed via next(err) or thrown in async handlers (Express 5)
  */
 function errorHandler(err, req, res, next) {
+    if (res.headersSent) {
+        return next(err);
+    }
+
     let error = { ...err };
     error.message = err.message || 'Internal Server Error';
     error.statusCode = err.statusCode || 500;

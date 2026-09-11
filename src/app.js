@@ -3,12 +3,25 @@ const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
 
 const authRouter = require("./routes/auth.route");
 const accountRouter = require("./routes/account.route");
 const transactionRouter = require("./routes/transaction.route");
+const { notFoundHandler, errorHandler } = require('./middleware/error.middleware');
 
 const app = express();
+
+// ==========================================
+// LOGGING MIDDLEWARE (Morgan)
+// ==========================================
+// Skip logging in test environment
+if (process.env.NODE_ENV !== 'test') {
+    // Use 'combined' format in production (Apache-style logs)
+    // Use 'dev' format in development (colored, concise)
+    const morganFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
+    app.use(morgan(morganFormat));
+}
 
 // ==========================================
 // SECURITY MIDDLEWARE
@@ -65,7 +78,22 @@ app.use("/api/transactions", transactionRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development'
+    });
 });
+
+// ==========================================
+// ERROR HANDLING MIDDLEWARE (Must be last)
+// ==========================================
+
+// 404 Handler - catches requests to undefined routes
+app.use(notFoundHandler);
+
+// Centralized Error Handler - catches all errors
+app.use(errorHandler);
 
 module.exports = app;

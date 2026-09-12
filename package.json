@@ -7,7 +7,8 @@
         "test": "jest --runInBand --detectOpenHandles",
         "test:coverage": "jest --coverage --runInBand",
         "dev": "npx nodemon src/server.js",
-        "start": "node src/server.js"
+        "start": "node src/server.js",
+        "demo": "node scripts/demo-server.js"
     },
     "keywords": [],
     "author": "",

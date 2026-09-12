@@ -7,3 +7,6 @@ src/.env
 dist/
 build/
 coverage/
+backend-server.log
+demo-api.log
+demo-api-error.log

@@ -8,6 +8,7 @@ const morgan = require('morgan');
 const authRouter = require("./routes/auth.route");
 const accountRouter = require("./routes/account.route");
 const transactionRouter = require("./routes/transaction.route");
+const demoRouter = require('./routes/demo.route');
 const { notFoundHandler, errorHandler } = require('./middleware/error.middleware');
 
 const app = express();
@@ -31,8 +32,17 @@ if (process.env.NODE_ENV !== 'test') {
 app.use(helmet());
 
 // CORS: Restrict to specific frontend origins
+const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map(origin => origin.trim())
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+
 const corsOptions = {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        callback(new Error('Origin is not allowed by CORS'));
+    },
     credentials: true, // Allow cookies to be sent
     optionsSuccessStatus: 200
 };
@@ -75,6 +85,7 @@ app.use(cookieParser());
 app.use("/api/auth", authLimiter, authRouter); // Stricter rate limit on auth routes
 app.use("/api/accounts", accountRouter);
 app.use("/api/transactions", transactionRouter);
+app.use('/api/demo', demoRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

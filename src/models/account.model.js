@@ -22,6 +22,4 @@ const accountSchema = new mongoose.Schema({
 }, {
     timestamps: true,
 });
-accountSchema.index({ user: 1, currency: 1 }, { unique: true });
-
 module.exports = mongoose.model('Account', accountSchema);

@@ -242,10 +242,10 @@ async function createInitialfundsTransaction(req, res, next) {
             return res.status(404).json({ message: "Destination account not found" });
         }
 
-        // Find system user's account
-        const fromUserAccount = await accountModel.findOne({ user: req.user._id });
+        // Find system user's account matching destination currency, or auto-create one
+        let fromUserAccount = await accountModel.findOne({ user: req.user._id, currency: toAccount.currency });
         if (!fromUserAccount) {
-            return res.status(404).json({ message: "System user account not found" });
+            fromUserAccount = await accountModel.create({ user: req.user._id, currency: toAccount.currency });
         }
 
         // Start ACID Transaction
@@ -303,7 +303,9 @@ async function createInitialfundsTransaction(req, res, next) {
  */
 async function getTransactionHistory(req, res, next) {
     try {
-        const { page, limit, status, startDate, endDate, accountId } = req.query;
+        const { page = 1, limit = 10, status, startDate, endDate, accountId } = req.query;
+        const pageNum = Math.max(1, parseInt(page, 10) || 1);
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
 
         // Get all accounts owned by the authenticated user
         const userAccounts = await accountModel.find({ user: req.user._id }).select('_id');
@@ -313,10 +315,12 @@ async function getTransactionHistory(req, res, next) {
             return res.status(200).json({
                 transactions: [],
                 pagination: {
-                    page: page || 1,
-                    limit: limit || 10,
+                    page: pageNum,
+                    limit: limitNum,
                     total: 0,
-                    totalPages: 0
+                    totalPages: 0,
+                    hasNextPage: false,
+                    hasPrevPage: false
                 }
             });
         }
@@ -332,7 +336,7 @@ async function getTransactionHistory(req, res, next) {
         // Filter by specific account if provided
         if (accountId && mongoose.Types.ObjectId.isValid(accountId)) {
             // Check if this account belongs to the user
-            if (!userAccountIds.some(id => id.toString() === accountId)) {
+            if (!userAccountIds.some(id => id.toString() === accountId.toString())) {
                 return res.status(403).json({ message: 'Access denied to this account' });
             }
             filter.$or = [
@@ -353,15 +357,19 @@ async function getTransactionHistory(req, res, next) {
                 filter.createdAt.$gte = new Date(startDate);
             }
             if (endDate) {
-                // Add one day to include the entire end date
+                // Add one day to include the entire end date if it's YYYY-MM-DD
                 const endDateTime = new Date(endDate);
-                endDateTime.setDate(endDateTime.getDate() + 1);
-                filter.createdAt.$lt = endDateTime;
+                if (endDate.length <= 10) {
+                    endDateTime.setDate(endDateTime.getDate() + 1);
+                    filter.createdAt.$lt = endDateTime;
+                } else {
+                    filter.createdAt.$lte = endDateTime;
+                }
             }
         }
 
         // Calculate pagination
-        const skip = (page - 1) * limit;
+        const skip = (pageNum - 1) * limitNum;
 
         // Execute query with pagination
         const [transactions, totalCount] = await Promise.all([
@@ -371,22 +379,22 @@ async function getTransactionHistory(req, res, next) {
                 .populate('toAccount', 'currency status')
                 .sort({ createdAt: -1 }) // Most recent first
                 .skip(skip)
-                .limit(limit)
+                .limit(limitNum)
                 .lean(),
             transactionModel.countDocuments(filter)
         ]);
 
-        const totalPages = Math.ceil(totalCount / limit);
+        const totalPages = Math.ceil(totalCount / limitNum);
 
         return res.status(200).json({
             transactions,
             pagination: {
-                page,
-                limit,
+                page: pageNum,
+                limit: limitNum,
                 total: totalCount,
                 totalPages,
-                hasNextPage: page < totalPages,
-                hasPrevPage: page > 1
+                hasNextPage: pageNum < totalPages,
+                hasPrevPage: pageNum > 1
             }
         });
 

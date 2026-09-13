@@ -84,14 +84,17 @@ const reverseTransactionSchema = z.object({
         .trim()
 });
 
+// Helper to treat empty strings as undefined in optional query fields
+const emptyStringToUndefined = z.literal('').transform(() => undefined);
+
 // Query Schema for Transaction History
 const transactionQuerySchema = z.object({
     page: z.coerce.number().int().positive().default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
-    status: z.enum(['pending', 'completed', 'failed', 'reversed']).optional(),
-    startDate: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
-    endDate: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
-    accountId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional()
+    status: z.enum(['pending', 'completed', 'failed', 'reversed']).or(emptyStringToUndefined).optional(),
+    startDate: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).or(emptyStringToUndefined).optional(),
+    endDate: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).or(emptyStringToUndefined).optional(),
+    accountId: z.string().regex(/^[0-9a-fA-F]{24}$/).or(emptyStringToUndefined).optional()
 });
 
 /**

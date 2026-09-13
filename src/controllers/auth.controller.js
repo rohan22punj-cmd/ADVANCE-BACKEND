@@ -127,7 +127,7 @@ async function userLoginController(req, res, next) {
  * Refresh Access Token using Refresh Token
  */
 async function refreshTokenController(req, res, next) {
-    const { refreshToken } = req.cookies;
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
     if (!refreshToken) {
         return res.status(401).json({ message: 'Refresh token not provided' });
@@ -166,7 +166,7 @@ async function refreshTokenController(req, res, next) {
  * Logout - Invalidate Refresh Token
  */
 async function logoutController(req, res, next) {
-    const { refreshToken } = req.cookies;
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
     try {
         if (refreshToken) {

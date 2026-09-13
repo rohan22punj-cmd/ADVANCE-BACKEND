@@ -16,7 +16,19 @@ export function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => { api.accounts().then(({ accounts: list }) => { setAccounts(list); setSelectedAccount(list[0]?._id || ''); }).catch(requestError => { setError(requestError.message); setLoading(false); }); }, []);
+  useEffect(() => {
+    api.accounts().then(({ accounts: list }) => {
+      setAccounts(list);
+      if (list.length > 0) {
+        setSelectedAccount(list[0]._id);
+      } else {
+        setLoading(false);
+      }
+    }).catch(requestError => {
+      setError(requestError.message);
+      setLoading(false);
+    });
+  }, []);
   useEffect(() => {
     if (!selectedAccount) return;
     setLoading(true); setError('');

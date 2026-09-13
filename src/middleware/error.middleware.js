@@ -34,7 +34,8 @@ function errorHandler(err, req, res, next) {
 
     let error = { ...err };
     error.message = err.message || 'Internal Server Error';
-    error.statusCode = err.statusCode || 500;
+    error.statusCode = err.statusCode || (err.message && err.message.includes('CORS') ? 403 : 500);
+    error.errors = err.errors || error.errors || null;
 
     // Log error for debugging (omit noisy 404s in production)
     if (process.env.NODE_ENV !== 'test') {

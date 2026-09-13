@@ -34,9 +34,12 @@ export const api = {
   balance: (accountId) => request(`/accounts/${accountId}`),
   transfer: (body) => request('/transactions', { method: 'POST', body: JSON.stringify(body) }),
   demoFund: (accountId) => request('/demo/fund', { method: 'POST', body: JSON.stringify({ accountId }) }),
-  transactions: ({ accountId, page = 1, limit = 10, status }) => {
-    const params = new URLSearchParams({ accountId, page: String(page), limit: String(limit) });
+  transactions: ({ accountId, page = 1, limit = 10, status } = {}) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', String(limit));
+    if (accountId) params.set('accountId', accountId);
     if (status) params.set('status', status);
-    return request(`/transactions?${params}`);
+    return request(`/transactions?${params.toString()}`);
   }
 };

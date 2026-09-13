@@ -1,10 +1,16 @@
+const mongoose = require('mongoose');
 const accountModel = require('../models/account.model');
 const ledgerModel = require('../models/ledger.model');
+const { AppError } = require('../middleware/error.middleware');
 
 async function createAccount(req, res, next) {
     try {
         const user = req.user;
-        const account = await accountModel.create({ user: user._id, ...req.body });
+        const account = await accountModel.create({
+            user: user._id,
+            currency: req.body.currency,
+            ...(req.body.status && { status: req.body.status })
+        });
         res.status(201).json({ message: 'Account created successfully', account });
     } catch (error) {
         next(error);
@@ -23,6 +29,10 @@ async function getAccounts(req, res, next) {
 
 async function getAccountBalanceController(req, res, next) {
     const accountId = req.params.accountId;
+
+    if (!mongoose.Types.ObjectId.isValid(accountId)) {
+        return next(new AppError('Invalid account ID format', 400));
+    }
 
     try {
         const account = await accountModel.findOne({

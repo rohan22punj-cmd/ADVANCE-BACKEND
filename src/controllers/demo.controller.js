@@ -10,6 +10,10 @@ async function demoFundAccount(req, res, next) {
 
     try {
         const { accountId, amount = 1000 } = req.body;
+        if (!accountId || !mongoose.Types.ObjectId.isValid(accountId)) {
+            return next(new AppError('Invalid account ID format', 400));
+        }
+
         const destination = await Account.findOne({ _id: accountId, user: req.user._id });
         if (!destination) return next(new AppError('Account not found', 404));
         if (destination.status !== 'active') return next(new AppError('Only active accounts can be funded', 400));

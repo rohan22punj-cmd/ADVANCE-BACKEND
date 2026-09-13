@@ -34,7 +34,7 @@ app.use(helmet());
 // CORS: Restrict to specific frontend origins
 const allowedOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map(origin => origin.trim())
-    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+    : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://localhost:4173', 'http://127.0.0.1:4173'];
 
 const corsOptions = {
     origin(origin, callback) {
@@ -51,9 +51,9 @@ app.use(cors(corsOptions));
 // Rate Limiting: Prevent brute force attacks on auth endpoints
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // Limit each IP to 5 requests per windowMs
+    max: process.env.NODE_ENV === 'test' ? 1000 : 50, // Limit requests per windowMs
     message: {
-        message: 'Too many login attempts from this IP, please try again after 15 minutes'
+        message: 'Too many auth requests from this IP, please try again after 15 minutes'
     },
     standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
     legacyHeaders: false, // Disable `X-RateLimit-*` headers
@@ -62,7 +62,7 @@ const authLimiter = rateLimit({
 // General API rate limiter (more permissive)
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    max: process.env.NODE_ENV === 'test' ? 10000 : 200, // Limit each IP per windowMs
     message: {
         message: 'Too many requests from this IP, please try again after 15 minutes'
     },

@@ -3,6 +3,7 @@ const ledgerModel = require("../models/ledger.model");
 const accountModel = require("../models/account.model");
 const mongoose = require("mongoose");
 const emailService = require("../service/GmailService");
+const redisService = require("../service/redis.service");
 
 function notify(send) {
     Promise.resolve().then(send).catch(() => undefined);
@@ -10,10 +11,12 @@ function notify(send) {
 
 /**
  * Account-to-Account Money Transfer
- * Executes a double-entry financial transfer within an ACID MongoDB session
+ * Executes a double-entry financial transfer protected by Redis Distributed Locks and MongoDB ACID Transactions
  */
 async function createTransaction(req, res, next) {
     const { fromAccountId, toAccountId, amount, idempotencyKey } = req.body;
+    let multiLock = null;
+    let idempotencyClaimed = false;
 
     try {
         // ==========================================
@@ -42,18 +45,59 @@ async function createTransaction(req, res, next) {
         }
 
         // ==========================================
-        // 2. IDEMPOTENCY CHECK
+        // 2. FAST REDIS IDEMPOTENCY CHECK
         // ==========================================
+        const redisIdempotency = await redisService.checkIdempotency(idempotencyKey);
+        if (redisIdempotency.status === 'COMPLETED') {
+            return res.status(200).json({
+                message: "Transaction already processed (cached)",
+                transaction: redisIdempotency.data?.transaction || redisIdempotency.data
+            });
+        }
+
+        if (redisIdempotency.status === 'IN_PROGRESS') {
+            return res.status(409).json({
+                message: "A transaction with this idempotency key is currently being processed"
+            });
+        }
+
+        // Fallback DB Idempotency check
         const existingTransaction = await transactionModel.findOne({ idempotencyKey });
         if (existingTransaction) {
+            await redisService.setIdempotencyCompleted(idempotencyKey, { transaction: existingTransaction });
             return res.status(409).json({
                 message: "Transaction already processed with this idempotency key",
                 transaction: existingTransaction
             });
         }
 
+        // Claim idempotency key in Redis (locks out duplicate concurrent submissions)
+        idempotencyClaimed = await redisService.setIdempotencyProcessing(idempotencyKey, 60);
+        if (!idempotencyClaimed) {
+            return res.status(409).json({
+                message: "A transaction with this idempotency key is currently being processed"
+            });
+        }
+
         // ==========================================
-        // 3. ACCOUNT VERIFICATION & AUTHORIZATION
+        // 3. REDIS DISTRIBUTED LOCK ACQUISITION
+        // ==========================================
+        // Lock both participating accounts in sorted order to prevent deadlocks
+        const accountLockKeys = [
+            `lock:account:${fromAccountId}`,
+            `lock:account:${toAccountId}`
+        ];
+
+        multiLock = await redisService.acquireMultiLock(accountLockKeys, 8000);
+        if (!multiLock.acquired) {
+            await redisService.clearIdempotency(idempotencyKey);
+            return res.status(429).json({
+                message: "Accounts are currently processing another transaction. Please try again shortly."
+            });
+        }
+
+        // ==========================================
+        // 4. ACCOUNT VERIFICATION & AUTHORIZATION
         // ==========================================
         // Sender account must exist and belong to the authenticated user
         const fromAccount = await accountModel.findOne({
@@ -62,32 +106,42 @@ async function createTransaction(req, res, next) {
         }).populate('user', 'name email');
 
         if (!fromAccount) {
+            await multiLock.releaseAll();
+            await redisService.clearIdempotency(idempotencyKey);
             return res.status(404).json({ message: "Source account not found or does not belong to you" });
         }
 
         if (fromAccount.status !== 'active') {
+            await multiLock.releaseAll();
+            await redisService.clearIdempotency(idempotencyKey);
             return res.status(400).json({ message: `Source account is ${fromAccount.status} and cannot initiate transfers` });
         }
 
         // Destination account must exist
         const toAccount = await accountModel.findById(toAccountId).populate('user', 'name email');
         if (!toAccount) {
+            await multiLock.releaseAll();
+            await redisService.clearIdempotency(idempotencyKey);
             return res.status(404).json({ message: "Destination account not found" });
         }
 
         if (toAccount.status !== 'active') {
+            await multiLock.releaseAll();
+            await redisService.clearIdempotency(idempotencyKey);
             return res.status(400).json({ message: `Destination account is ${toAccount.status} and cannot receive transfers` });
         }
 
         // Ensure both accounts use the same currency
         if (fromAccount.currency !== toAccount.currency) {
+            await multiLock.releaseAll();
+            await redisService.clearIdempotency(idempotencyKey);
             return res.status(400).json({
                 message: `Currency mismatch: source account is in ${fromAccount.currency} but destination is in ${toAccount.currency}`
             });
         }
 
         // ==========================================
-        // 4. PRE-TRANSACTION BALANCE CHECK (LEDGER AGGREGATION)
+        // 5. PRE-TRANSACTION BALANCE CHECK (LEDGER AGGREGATION)
         // ==========================================
         const balanceAgg = await ledgerModel.aggregate([
             { $match: { account: fromAccount._id } },
@@ -110,6 +164,9 @@ async function createTransaction(req, res, next) {
         const currentBalance = balanceAgg.length > 0 ? balanceAgg[0].balance : 0;
 
         if (currentBalance < numericAmount) {
+            await multiLock.releaseAll();
+            await redisService.clearIdempotency(idempotencyKey);
+
             // Send failure notification email
             if (fromAccount.user?.email) {
                 notify(() => emailService.failureNotificationEmail(
@@ -128,7 +185,7 @@ async function createTransaction(req, res, next) {
         }
 
         // ==========================================
-        // 5. ACID TRANSACTION EXECUTION (MONGODB SESSION)
+        // 6. ACID TRANSACTION EXECUTION (MONGODB SESSION)
         // ==========================================
         const session = await mongoose.startSession();
         session.startTransaction();
@@ -169,7 +226,16 @@ async function createTransaction(req, res, next) {
             await session.commitTransaction();
             session.endSession();
 
-            // Step F: Send email notification asynchronously (non-blocking)
+            // Step F: Cache completed transaction in Redis for instant replay
+            await redisService.setIdempotencyCompleted(idempotencyKey, { transaction });
+
+            // Step G: Release distributed locks
+            if (multiLock) {
+                await multiLock.releaseAll();
+                multiLock = null;
+            }
+
+            // Step H: Send email notification asynchronously (non-blocking)
             if (fromAccount.user?.email) {
                 notify(() => emailService.sendTransactionEmail(
                     fromAccount.user.email,
@@ -188,6 +254,15 @@ async function createTransaction(req, res, next) {
             await session.abortTransaction();
             session.endSession();
 
+            // Clear idempotency lock in Redis so client can retry
+            await redisService.clearIdempotency(idempotencyKey);
+
+            // Release distributed locks
+            if (multiLock) {
+                await multiLock.releaseAll();
+                multiLock = null;
+            }
+
             // Send failure notification email
             if (fromAccount.user?.email) {
                 notify(() => emailService.failureNotificationEmail(
@@ -201,6 +276,10 @@ async function createTransaction(req, res, next) {
         }
 
     } catch (error) {
+        if (multiLock) {
+            await multiLock.releaseAll().catch(() => {});
+        }
+        await redisService.clearIdempotency(idempotencyKey).catch(() => {});
         next(error);
     }
 }
@@ -405,11 +484,12 @@ async function getTransactionHistory(req, res, next) {
 
 /**
  * Reverse a Completed Transaction
- * Creates offsetting ledger entries to reverse a completed transaction
+ * Creates offsetting ledger entries to reverse a completed transaction under Redis Distributed Lock protection
  */
 async function reverseTransaction(req, res, next) {
     const { transactionId } = req.params;
     const { reason, idempotencyKey } = req.body;
+    let multiLock = null;
 
     try {
         // Validate transaction ID format
@@ -457,6 +537,21 @@ async function reverseTransaction(req, res, next) {
         await originalTransaction.fromAccount.populate('user', 'name email');
         await originalTransaction.toAccount.populate('user', 'name email');
 
+        // ==========================================
+        // REDIS DISTRIBUTED LOCK ACQUISITION
+        // ==========================================
+        const accountLockKeys = [
+            `lock:account:${originalTransaction.fromAccount._id}`,
+            `lock:account:${originalTransaction.toAccount._id}`
+        ];
+
+        multiLock = await redisService.acquireMultiLock(accountLockKeys, 8000);
+        if (!multiLock.acquired) {
+            return res.status(429).json({
+                message: "Accounts are currently busy processing another transfer. Please retry shortly."
+            });
+        }
+
         // Check if destination account (who received funds) has sufficient balance to be debited
         const balanceAgg = await ledgerModel.aggregate([
             { $match: { account: originalTransaction.toAccount._id } },
@@ -479,6 +574,7 @@ async function reverseTransaction(req, res, next) {
         const currentBalance = balanceAgg.length > 0 ? balanceAgg[0].balance : 0;
 
         if (currentBalance < originalTransaction.amount) {
+            await multiLock.releaseAll();
             return res.status(400).json({
                 message: "Cannot reverse: destination account has insufficient funds for reversal",
                 requiredAmount: originalTransaction.amount,
@@ -532,6 +628,12 @@ async function reverseTransaction(req, res, next) {
             await session.commitTransaction();
             session.endSession();
 
+            // Release distributed locks
+            if (multiLock) {
+                await multiLock.releaseAll();
+                multiLock = null;
+            }
+
             // Send email notifications
             if (originalTransaction.fromAccount.user?.email) {
                 notify(() => emailService.sendTransactionEmail(
@@ -559,10 +661,19 @@ async function reverseTransaction(req, res, next) {
         } catch (error) {
             await session.abortTransaction();
             session.endSession();
+
+            if (multiLock) {
+                await multiLock.releaseAll();
+                multiLock = null;
+            }
+
             throw error;
         }
 
     } catch (error) {
+        if (multiLock) {
+            await multiLock.releaseAll().catch(() => {});
+        }
         next(error);
     }
 }

@@ -19,6 +19,10 @@ const accountSchema = new mongoose.Schema({
         required: true,
         default: 'INR',
     },
+    version: {
+        type: Number,
+        default: 0,
+    },
 }, {
     timestamps: true,
 });

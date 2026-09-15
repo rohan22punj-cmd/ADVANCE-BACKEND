@@ -191,7 +191,45 @@ async function createTransaction(req, res, next) {
         session.startTransaction();
 
         try {
-            // Step A: Create transaction journal entry with status "pending"
+            // Step A: Acquire database-level write conflict barrier (Optimistic Concurrency Control)
+            // Mutating the source account document inside the session forces MongoDB's WiredTiger engine
+            // to acquire a document write lock. If another concurrent transfer targets this account when Redis
+            // is offline, MongoDB automatically triggers a WriteConflictError, preventing race condition overdraws.
+            const lockedSource = await accountModel.findOneAndUpdate(
+                { _id: fromAccount._id, status: 'active' },
+                { $inc: { version: 1 } },
+                { session, returnDocument: 'after' }
+            );
+
+            if (!lockedSource) {
+                throw new Error("Source account is no longer active or available");
+            }
+
+            // Step B: Re-verify balance inside the transaction snapshot to guarantee consistency
+            const txBalanceAgg = await ledgerModel.aggregate([
+                { $match: { account: fromAccount._id } },
+                {
+                    $group: {
+                        _id: null,
+                        balance: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$type", "credit"] },
+                                    "$amount",
+                                    { $multiply: ["$amount", -1] }
+                                ]
+                            }
+                        }
+                    }
+                }
+            ]).session(session);
+
+            const txBalance = txBalanceAgg.length > 0 ? txBalanceAgg[0].balance : 0;
+            if (txBalance < numericAmount) {
+                throw new Error(`Insufficient funds: available balance is ${txBalance} ${fromAccount.currency}`);
+            }
+
+            // Step C: Create transaction journal entry with status "pending"
             const transactionDocs = await transactionModel.create([{
                 fromAccount: fromAccount._id,
                 toAccount: toAccount._id,
@@ -202,7 +240,7 @@ async function createTransaction(req, res, next) {
 
             const transaction = transactionDocs[0];
 
-            // Step B: Write DEBIT ledger entry for sender account
+            // Step D: Write DEBIT ledger entry for sender account
             await ledgerModel.create([{
                 account: fromAccount._id,
                 amount: numericAmount,
@@ -210,7 +248,7 @@ async function createTransaction(req, res, next) {
                 type: 'debit',
             }], { session });
 
-            // Step C: Write CREDIT ledger entry for recipient account
+            // Step E: Write CREDIT ledger entry for recipient account
             await ledgerModel.create([{
                 account: toAccount._id,
                 amount: numericAmount,
@@ -218,11 +256,11 @@ async function createTransaction(req, res, next) {
                 type: 'credit',
             }], { session });
 
-            // Step D: Update transaction status to "completed"
+            // Step F: Update transaction status to "completed"
             transaction.status = 'completed';
             await transaction.save({ session });
 
-            // Step E: Commit the entire atomic transaction
+            // Step G: Commit the entire atomic transaction
             await session.commitTransaction();
             session.endSession();
 
@@ -588,6 +626,41 @@ async function reverseTransaction(req, res, next) {
         session.startTransaction();
 
         try {
+            // Step A: Acquire write conflict lock on the account being debited (the original recipient)
+            const lockedDebitAccount = await accountModel.findOneAndUpdate(
+                { _id: originalTransaction.toAccount._id, status: 'active' },
+                { $inc: { version: 1 } },
+                { session, returnDocument: 'after' }
+            );
+
+            if (!lockedDebitAccount) {
+                throw new Error("Target account for reversal is no longer active");
+            }
+
+            // Step B: Re-verify balance within transaction session
+            const txBalanceAgg = await ledgerModel.aggregate([
+                { $match: { account: originalTransaction.toAccount._id } },
+                {
+                    $group: {
+                        _id: null,
+                        balance: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$type", "credit"] },
+                                    "$amount",
+                                    { $multiply: ["$amount", -1] }
+                                ]
+                            }
+                        }
+                    }
+                }
+            ]).session(session);
+
+            const txBalance = txBalanceAgg.length > 0 ? txBalanceAgg[0].balance : 0;
+            if (txBalance < originalTransaction.amount) {
+                throw new Error(`Insufficient funds for reversal: required ${originalTransaction.amount}, available ${txBalance}`);
+            }
+
             // Create reversal transaction record
             const reversalDocs = await transactionModel.create([{
                 fromAccount: originalTransaction.toAccount._id,  // Reversed direction

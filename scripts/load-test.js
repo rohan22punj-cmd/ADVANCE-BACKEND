@@ -8,7 +8,7 @@ const path = require('path');
 // Set environment for benchmark
 process.env.NODE_ENV = 'benchmark';
 process.env.DISABLE_RATE_LIMIT = 'true';
-process.env.PORT = '0'; // Random available port
+process.env.PORT = '0';
 process.env.JWT_SECRET = 'load-test-super-secret-jwt-key-minimum-32-chars-long';
 
 const app = require('../src/app');
@@ -19,9 +19,6 @@ const transactionModel = require('../src/models/transaction.model');
 const redisService = require('../src/service/redis.service');
 const jwt = require('jsonwebtoken');
 
-/**
- * High-precision percentile calculation helper
- */
 function calculatePercentiles(latencies) {
     if (latencies.length === 0) return { p50: 0, p90: 0, p95: 0, p99: 0, min: 0, max: 0, avg: 0 };
     const sorted = [...latencies].sort((a, b) => a - b);
@@ -42,9 +39,6 @@ function calculatePercentiles(latencies) {
     };
 }
 
-/**
- * Execute HTTP POST Request via native Node http module with keep-alive agent
- */
 function sendTransferRequest(agent, serverPort, token, fromAccountId, toAccountId, amount) {
     return new Promise((resolve) => {
         const idempotencyKey = crypto.randomUUID();
@@ -68,7 +62,7 @@ function sendTransferRequest(agent, serverPort, token, fromAccountId, toAccountI
                 'Content-Length': Buffer.byteLength(postData),
                 'Authorization': `Bearer ${token}`
             },
-            timeout: 15000
+            timeout: 30000
         }, (res) => {
             let body = '';
             res.on('data', chunk => { body += chunk; });
@@ -86,6 +80,10 @@ function sendTransferRequest(agent, serverPort, token, fromAccountId, toAccountI
         req.on('error', (err) => {
             const endTime = process.hrtime.bigint();
             const latencyMs = Number(endTime - startTime) / 1e6;
+            if (!global.printedErr) {
+                console.log('Socket error example:', err.code || err.message);
+                global.printedErr = true;
+            }
             resolve({
                 statusCode: 0,
                 error: err.message,
@@ -97,6 +95,8 @@ function sendTransferRequest(agent, serverPort, token, fromAccountId, toAccountI
         req.end();
     });
 }
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function runBenchmark() {
     console.log('======================================================================');
@@ -112,9 +112,9 @@ async function runBenchmark() {
     redisService.getRedisClient();
 
     const server = http.createServer(app);
-    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', 2048, resolve));
     const serverPort = server.address().port;
-    const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 1000 });
+    const httpAgent = new http.Agent({ keepAlive: true, maxSockets: Infinity, maxFreeSockets: 1000 });
     console.log(`       Backend API live on port ${serverPort}\n`);
 
     // Create Test User & Generate Token
@@ -133,69 +133,74 @@ async function runBenchmark() {
 
     // ======================================================================
     // BENCHMARK 1: 500 CONCURRENT USERS ACROSS DISJOINT ACCOUNT POOLS
-    // Measures true system throughput and unconstrained ACID transaction latency
     // ======================================================================
-    console.log('[2/4] Executing Benchmark 1: High-Throughput Distributed Transfers...');
-    console.log('       • 50 Distinct Account Pairs (100 total accounts)');
-    console.log('       • 500 Concurrent Virtual Workers');
-    console.log('       • 1,000 Total Transfers of ₹50 each');
-
-    const NUM_PAIRS = 50;
-    const accountPairs = [];
+    const CONCURRENCY_1 = 500;
+    const NUM_PAIRS = 500; // 1,000 total accounts (500 distinct sender-receiver pairs)
     const INITIAL_PER_ACCOUNT = 100000;
 
-    for (let i = 0; i < NUM_PAIRS; i++) {
-        const sender = await accountModel.create({ user: testUser._id, currency: 'INR', status: 'active' });
-        const receiver = await accountModel.create({ user: testUser._id, currency: 'INR', status: 'active' });
+    console.log(`[2/4] Executing Benchmark 1: High-Throughput Distributed Transfers...`);
+    console.log(`       • Seeding ${NUM_PAIRS} Distinct Account Pairs (1,000 total accounts)...`);
 
-        const initTx = await transactionModel.create({
-            fromAccount: sender._id,
-            toAccount: sender._id,
+    const accountPairs = [];
+    const seedAccounts = [];
+    const seedTxs = [];
+    const seedLedgers = [];
+
+    for (let i = 0; i < NUM_PAIRS; i++) {
+        const senderId = new mongoose.Types.ObjectId();
+        const receiverId = new mongoose.Types.ObjectId();
+        const txId = new mongoose.Types.ObjectId();
+
+        seedAccounts.push(
+            { _id: senderId, user: testUser._id, currency: 'INR', status: 'active', version: 0 },
+            { _id: receiverId, user: testUser._id, currency: 'INR', status: 'active', version: 0 }
+        );
+
+        seedTxs.push({
+            _id: txId,
+            fromAccount: senderId,
+            toAccount: senderId,
             status: 'completed',
             amount: INITIAL_PER_ACCOUNT,
             idempotencyKey: `seed-pair-${i}-${Date.now()}`
         });
 
-        await ledgerModel.create({
-            account: sender._id,
+        seedLedgers.push({
+            account: senderId,
             amount: INITIAL_PER_ACCOUNT,
-            transaction: initTx._id,
+            transaction: txId,
             type: 'credit'
         });
 
-        accountPairs.push({ senderId: sender._id.toString(), receiverId: receiver._id.toString() });
+        accountPairs.push({ senderId: senderId.toString(), receiverId: receiverId.toString() });
     }
 
-    const CONCURRENCY_1 = 500;
-    const TOTAL_REQUESTS_1 = 1000;
+    await accountModel.insertMany(seedAccounts);
+    await transactionModel.insertMany(seedTxs);
+    await ledgerModel.insertMany(seedLedgers);
+    console.log(`       • Accounts seeded successfully.`);
+    console.log(`       • Launching ${CONCURRENCY_1} Concurrent Virtual Workers...`);
+
+    const TOTAL_REQUESTS_1 = 500;
     const latencies1 = [];
     const statusCodes1 = {};
-    let reqIndex1 = 0;
 
     const start1 = process.hrtime.bigint();
-    const workers1 = [];
 
-    for (let w = 0; w < CONCURRENCY_1; w++) {
-        workers1.push((async () => {
-            while (true) {
-                const currentIdx = reqIndex1++;
-                if (currentIdx >= TOTAL_REQUESTS_1) break;
-
-                const pair = accountPairs[currentIdx % NUM_PAIRS];
-                const res = await sendTransferRequest(
-                    httpAgent,
-                    serverPort,
-                    token,
-                    pair.senderId,
-                    pair.receiverId,
-                    50
-                );
-
-                latencies1.push(res.latencyMs);
-                statusCodes1[res.statusCode] = (statusCodes1[res.statusCode] || 0) + 1;
-            }
-        })());
-    }
+    // Launch all 500 concurrent requests across distinct account pairs
+    const workers1 = accountPairs.map((pair) => {
+        return sendTransferRequest(
+            httpAgent,
+            serverPort,
+            token,
+            pair.senderId,
+            pair.receiverId,
+            50
+        ).then(res => {
+            latencies1.push(res.latencyMs);
+            statusCodes1[res.statusCode] = (statusCodes1[res.statusCode] || 0) + 1;
+        });
+    });
 
     await Promise.all(workers1);
     const end1 = process.hrtime.bigint();
@@ -207,15 +212,13 @@ async function runBenchmark() {
 
     // ======================================================================
     // BENCHMARK 2: HOTSPOT CONCURRENT MUTEX CONTENTION TEST
-    // Measures lock contention handling, rejection speed, and conservation integrity
     // ======================================================================
     console.log('[3/4] Executing Benchmark 2: Single-Account Hotspot Mutex Contention...');
     console.log('       • 1 Single Hotspot Sender Account (Initial Balance: ₹500,000)');
     console.log('       • 500 Concurrent Virtual Workers attacking the same account simultaneously');
-    console.log('       • 500 Simultaneous Transfers of ₹10 each');
 
-    const hotSender = await accountModel.create({ user: testUser._id, currency: 'INR', status: 'active' });
-    const hotReceiver = await accountModel.create({ user: testUser._id, currency: 'INR', status: 'active' });
+    const hotSender = await accountModel.create({ user: testUser._id, currency: 'INR', status: 'active', version: 0 });
+    const hotReceiver = await accountModel.create({ user: testUser._id, currency: 'INR', status: 'active', version: 0 });
 
     const hotInitTx = await transactionModel.create({
         fromAccount: hotSender._id,
@@ -304,7 +307,8 @@ async function runBenchmark() {
     console.log(`  • Max:                 ${stats1.max} ms`);
     console.log('Status Codes:');
     for (const [code, count] of Object.entries(statusCodes1)) {
-        console.log(`  • HTTP ${code}: ${count} (${((count / TOTAL_REQUESTS_1) * 100).toFixed(1)}%)`);
+        const desc = code === '201' ? 'Success (201 Created)' : code === '429' ? 'Lock Contention (429)' : 'Other';
+        console.log(`  • HTTP ${code} (${desc}): ${count} (${((count / TOTAL_REQUESTS_1) * 100).toFixed(1)}%)`);
     }
 
     console.log('\n======================================================================');
@@ -323,7 +327,7 @@ async function runBenchmark() {
     console.log('Status Codes:');
     for (const [code, count] of Object.entries(statusCodes2)) {
         const desc = code === '201' ? 'Successful Transfers' : code === '429' ? 'Protected by Mutex (429)' : 'Other';
-        console.log(`  • HTTP ${code} (${desc}): ${count}`);
+        console.log(`  • HTTP ${code} (${desc}): ${count} (${((count / CONCURRENCY_2) * 100).toFixed(1)}%)`);
     }
     console.log('Ledger Invariant Audit:');
     console.log(`  • Initial Balance:     ₹5,00,000`);

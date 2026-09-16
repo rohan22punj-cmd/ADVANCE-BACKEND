@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-16T16:19:45.550Z",
+  "timestamp": "2026-09-16T16:21:52.677Z",
   "environment": {
     "node": "v24.14.0",
     "database": "MongoDB 7.0 (WiredTiger Replica Set)",
@@ -7,42 +7,41 @@
   },
   "benchmark1_distributedThroughput": {
     "concurrency": 500,
-    "totalRequests": 1000,
-    "durationSeconds": 1.8,
-    "throughputRps": 555.56,
+    "totalRequests": 500,
+    "durationSeconds": 2.74,
+    "throughputRps": 182.47,
     "latencyMs": {
-      "min": 116.26,
-      "max": 1792.99,
-      "avg": 516.53,
-      "p50": 214.01,
-      "p90": 1318.86,
-      "p95": 1470.56,
-      "p99": 1785.44
+      "min": 146.01,
+      "max": 2729.04,
+      "avg": 1306.81,
+      "p50": 153.35,
+      "p90": 2717.98,
+      "p95": 2719.98,
+      "p99": 2724.42
     },
     "statusCodes": {
-      "0": 704,
-      "201": 50,
-      "429": 246
+      "0": 268,
+      "201": 232
     }
   },
   "benchmark2_hotspotContention": {
     "concurrency": 500,
     "totalRequests": 500,
-    "durationSeconds": 1.17,
-    "throughputRps": 426.51,
+    "durationSeconds": 1.12,
+    "throughputRps": 446.02,
     "latencyMs": {
-      "min": 264.22,
-      "max": 1171.27,
-      "avg": 898.74,
-      "p50": 908.11,
-      "p90": 1128.41,
-      "p95": 1129.03,
-      "p99": 1142.67
+      "min": 235.96,
+      "max": 1119.46,
+      "avg": 873.46,
+      "p50": 857.35,
+      "p90": 1078.17,
+      "p95": 1080.16,
+      "p99": 1088.95
     },
     "statusCodes": {
-      "0": 12,
+      "0": 36,
       "201": 1,
-      "429": 487
+      "429": 463
     },
     "ledgerConservationPassed": true
   }

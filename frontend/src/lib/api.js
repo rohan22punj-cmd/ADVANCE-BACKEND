@@ -34,6 +34,7 @@ export const api = {
   balance: (accountId) => request(`/accounts/${accountId}`),
   transfer: (body) => request('/transactions', { method: 'POST', body: JSON.stringify(body) }),
   demoFund: (accountId) => request('/demo/fund', { method: 'POST', body: JSON.stringify({ accountId }) }),
+  reverseTransaction: (transactionId, body) => request(`/transactions/${transactionId}/reverse`, { method: 'POST', body: JSON.stringify(body) }),
   transactions: ({ accountId, page = 1, limit = 10, status } = {}) => {
     const params = new URLSearchParams();
     params.set('page', String(page));

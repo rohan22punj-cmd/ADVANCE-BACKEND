@@ -8,7 +8,8 @@
         "test:coverage": "jest --coverage --runInBand",
         "dev": "npx nodemon src/server.js",
         "start": "node src/server.js",
-        "demo": "node scripts/demo-server.js"
+        "demo": "node scripts/demo-server.js",
+        "load-test": "node scripts/load-test.js"
     },
     "keywords": [],
     "author": "",

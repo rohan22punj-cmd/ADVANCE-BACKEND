@@ -49,9 +49,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Rate Limiting: Prevent brute force attacks on auth endpoints
+const isExemptFromRateLimit = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'benchmark' || process.env.DISABLE_RATE_LIMIT === 'true';
+
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === 'test' ? 1000 : 50, // Limit requests per windowMs
+    max: isExemptFromRateLimit ? 100000 : 50, // Limit requests per windowMs
     message: {
         message: 'Too many auth requests from this IP, please try again after 15 minutes'
     },
@@ -62,7 +64,7 @@ const authLimiter = rateLimit({
 // General API rate limiter (more permissive)
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === 'test' ? 10000 : 200, // Limit each IP per windowMs
+    max: isExemptFromRateLimit ? 500000 : 200, // Limit each IP per windowMs
     message: {
         message: 'Too many requests from this IP, please try again after 15 minutes'
     },

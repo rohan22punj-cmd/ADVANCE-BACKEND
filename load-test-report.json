@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-09-16T16:19:45.550Z",
+  "environment": {
+    "node": "v24.14.0",
+    "database": "MongoDB 7.0 (WiredTiger Replica Set)",
+    "cache": "Redis 7 (Distributed Mutex & Idempotency)"
+  },
+  "benchmark1_distributedThroughput": {
+    "concurrency": 500,
+    "totalRequests": 1000,
+    "durationSeconds": 1.8,
+    "throughputRps": 555.56,
+    "latencyMs": {
+      "min": 116.26,
+      "max": 1792.99,
+      "avg": 516.53,
+      "p50": 214.01,
+      "p90": 1318.86,
+      "p95": 1470.56,
+      "p99": 1785.44
+    },
+    "statusCodes": {
+      "0": 704,
+      "201": 50,
+      "429": 246
+    }
+  },
+  "benchmark2_hotspotContention": {
+    "concurrency": 500,
+    "totalRequests": 500,
+    "durationSeconds": 1.17,
+    "throughputRps": 426.51,
+    "latencyMs": {
+      "min": 264.22,
+      "max": 1171.27,
+      "avg": 898.74,
+      "p50": 908.11,
+      "p90": 1128.41,
+      "p95": 1129.03,
+      "p99": 1142.67
+    },
+    "statusCodes": {
+      "0": 12,
+      "201": 1,
+      "429": 487
+    },
+    "ledgerConservationPassed": true
+  }
+}

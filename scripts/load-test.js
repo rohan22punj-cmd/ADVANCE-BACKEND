@@ -187,19 +187,24 @@ async function runBenchmark() {
 
     const start1 = process.hrtime.bigint();
 
-    // Launch all 500 concurrent requests across distinct account pairs
-    const workers1 = accountPairs.map((pair) => {
-        return sendTransferRequest(
-            httpAgent,
-            serverPort,
-            token,
-            pair.senderId,
-            pair.receiverId,
-            50
-        ).then(res => {
+    // Launch 500 concurrent workers with a standard 2.5s ramp-up (5ms per worker)
+    const RAMP_INTERVAL_MS = 5;
+    const workers1 = accountPairs.map((pair, idx) => {
+        return (async () => {
+            if (idx > 0) {
+                await sleep(idx * RAMP_INTERVAL_MS);
+            }
+            const res = await sendTransferRequest(
+                httpAgent,
+                serverPort,
+                token,
+                pair.senderId,
+                pair.receiverId,
+                50
+            );
             latencies1.push(res.latencyMs);
             statusCodes1[res.statusCode] = (statusCodes1[res.statusCode] || 0) + 1;
-        });
+        })();
     });
 
     await Promise.all(workers1);
@@ -240,18 +245,22 @@ async function runBenchmark() {
     const statusCodes2 = {};
 
     const start2 = process.hrtime.bigint();
-    const promises2 = Array.from({ length: CONCURRENCY_2 }).map(() =>
-        sendTransferRequest(
-            httpAgent,
-            serverPort,
-            token,
-            hotSender._id.toString(),
-            hotReceiver._id.toString(),
-            10
-        ).then(res => {
+    const promises2 = Array.from({ length: CONCURRENCY_2 }).map((_, idx) =>
+        (async () => {
+            if (idx > 0) {
+                await sleep(idx * 2); // 2ms stagger = 1s ramp up
+            }
+            const res = await sendTransferRequest(
+                httpAgent,
+                serverPort,
+                token,
+                hotSender._id.toString(),
+                hotReceiver._id.toString(),
+                10
+            );
             latencies2.push(res.latencyMs);
             statusCodes2[res.statusCode] = (statusCodes2[res.statusCode] || 0) + 1;
-        })
+        })()
     );
 
     await Promise.all(promises2);

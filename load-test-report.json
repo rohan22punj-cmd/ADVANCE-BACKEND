@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-16T16:21:52.677Z",
+  "timestamp": "2026-09-16T16:22:32.047Z",
   "environment": {
     "node": "v24.14.0",
     "database": "MongoDB 7.0 (WiredTiger Replica Set)",
@@ -8,16 +8,16 @@
   "benchmark1_distributedThroughput": {
     "concurrency": 500,
     "totalRequests": 500,
-    "durationSeconds": 2.74,
-    "throughputRps": 182.47,
+    "durationSeconds": 2.9,
+    "throughputRps": 172.4,
     "latencyMs": {
-      "min": 146.01,
-      "max": 2729.04,
-      "avg": 1306.81,
-      "p50": 153.35,
-      "p90": 2717.98,
-      "p95": 2719.98,
-      "p99": 2724.42
+      "min": 173.95,
+      "max": 2883.15,
+      "avg": 1394.14,
+      "p50": 182.08,
+      "p90": 2854.23,
+      "p95": 2876.74,
+      "p99": 2881.09
     },
     "statusCodes": {
       "0": 268,
@@ -27,16 +27,16 @@
   "benchmark2_hotspotContention": {
     "concurrency": 500,
     "totalRequests": 500,
-    "durationSeconds": 1.12,
-    "throughputRps": 446.02,
+    "durationSeconds": 1.13,
+    "throughputRps": 441.27,
     "latencyMs": {
-      "min": 235.96,
-      "max": 1119.46,
-      "avg": 873.46,
-      "p50": 857.35,
-      "p90": 1078.17,
-      "p95": 1080.16,
-      "p99": 1088.95
+      "min": 260.13,
+      "max": 1132.81,
+      "avg": 877.94,
+      "p50": 923.55,
+      "p90": 1106.46,
+      "p95": 1106.83,
+      "p99": 1107.89
     },
     "statusCodes": {
       "0": 36,

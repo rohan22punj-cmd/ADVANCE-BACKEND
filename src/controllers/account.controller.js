@@ -76,8 +76,43 @@ async function getAccountBalanceController(req, res, next) {
     }
 }
 
+async function lookupAccountForTransfer(req, res, next) {
+    const accountId = req.params.accountId;
+
+    if (!mongoose.Types.ObjectId.isValid(accountId)) {
+        return next(new AppError('Invalid account ID format', 400));
+    }
+
+    try {
+        const account = await accountModel.findById(accountId).populate('user', 'name');
+
+        if (!account) {
+            return res.status(404).json({ message: 'Account not found' });
+        }
+
+        if (account.status !== 'active') {
+            return res.status(400).json({ message: 'Account is not active and cannot receive transfers' });
+        }
+
+        const accountIdStr = account._id.toString();
+        const maskedAccountId = '****' + accountIdStr.slice(-4);
+
+        res.status(200).json({
+            account: {
+                maskedId: maskedAccountId,
+                currency: account.currency,
+                status: account.status,
+                holderName: account.user?.name || 'Unknown'
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 module.exports = {
     createAccount,
     getAccounts,
-    getAccountBalanceController
+    getAccountBalanceController,
+    lookupAccountForTransfer
 };

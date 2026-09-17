@@ -7,5 +7,6 @@ const { validateBody, createAccountSchema } = require('../middleware/validate.mi
 router.post('/', authMiddleware, validateBody(createAccountSchema), accountController.createAccount);
 router.get('/', authMiddleware, accountController.getAccounts);
 router.get('/:accountId', authMiddleware, accountController.getAccountBalanceController);
+router.get('/lookup/:accountId', authMiddleware, accountController.lookupAccountForTransfer);
 
 module.exports = router;

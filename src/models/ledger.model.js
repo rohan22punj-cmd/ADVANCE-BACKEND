@@ -6,25 +6,21 @@ const ledgerSchema = new mongoose.Schema({
         ref: 'Account',
         required: true,
         index: true,
-        immutable: true,
     },
     amount: {
         type: Number,
         required: true,
-        immutable: true,
     },
     transaction: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Transaction',
         required: true,
         index: true,
-        immutable: true,
     },
     type: {
         type: String,
         enum: ['credit', 'debit'],
         required: true,
-        immutable: true,
     },
 });
 

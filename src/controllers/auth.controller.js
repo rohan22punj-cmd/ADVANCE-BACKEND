@@ -78,13 +78,22 @@ async function userLoginController(req, res, next) {
     const { email, password } = req.body;
 
     try {
+        // #region agent log
+        fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'auth.controller.js:login:entry',message:'Login attempt',data:{hasEmail:Boolean(email),hasJwtSecret:Boolean(process.env.JWT_SECRET),origin:req.headers.origin||null},timestamp:Date.now(),hypothesisId:'A-B-C',runId:'pre-fix'})}).catch(()=>{});
+        // #endregion
         const user = await userModel.findOne({ email }).select('+password');
         if (!user) {
+            // #region agent log
+            fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'auth.controller.js:login:notFound',message:'Login user not found',data:{emailDomain:email?String(email).split('@')[1]:null},timestamp:Date.now(),hypothesisId:'C',runId:'pre-fix'})}).catch(()=>{});
+            // #endregion
             return res.status(404).json({ message: 'User not found' });
         }
 
         const isPasswordValid = await user.comparePassword(password);
         if (!isPasswordValid) {
+            // #region agent log
+            fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'auth.controller.js:login:badPassword',message:'Login invalid password',timestamp:Date.now(),hypothesisId:'C',runId:'pre-fix'})}).catch(()=>{});
+            // #endregion
             return res.status(401).json({ message: 'Invalid password' });
         }
 
@@ -109,6 +118,9 @@ async function userLoginController(req, res, next) {
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
+        // #region agent log
+        fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'auth.controller.js:login:success',message:'Login success cookies set',data:{userId:String(user._id),cookieSecure:process.env.NODE_ENV==='production'},timestamp:Date.now(),hypothesisId:'B-E',runId:'pre-fix'})}).catch(()=>{});
+        // #endregion
         return res.status(200).json({
             user: {
                 _id: user._id,
@@ -119,6 +131,9 @@ async function userLoginController(req, res, next) {
             refreshToken
         });
     } catch (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'auth.controller.js:login:error',message:'Login handler error',data:{errorName:error?.name,errorMessage:error?.message},timestamp:Date.now(),hypothesisId:'A-B',runId:'pre-fix'})}).catch(()=>{});
+        // #endregion
         next(error);
     }
 }

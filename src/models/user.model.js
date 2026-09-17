@@ -35,13 +35,14 @@ const userSchema = new mongoose.Schema({
         },
         createdAt: {
             type: Date,
-            default: Date.now,
-            expires: 7 * 24 * 60 * 60 // Expire after 7 days
+            default: Date.now
         }
     }]
 }, {
-    timestamps: true // Automatically adds createdAt and updatedAt fields
+    timestamps: true
 });
+
+userSchema.index({ 'refreshTokens.createdAt': 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 });
 
 userSchema.pre('save', async function() {
     if (!this.isModified('password')) {

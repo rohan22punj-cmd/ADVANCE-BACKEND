@@ -9,13 +9,20 @@ export class ApiError extends Error {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_URL}${path}`, {
+  const url = `${API_URL}${path}`;
+  // #region agent log
+  fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'api.js:request:start',message:'API request start',data:{url,method:options.method||'GET',apiUrl:API_URL},timestamp:Date.now(),hypothesisId:'D-E',runId:'pre-fix'})}).catch(()=>{});
+  // #endregion
+  const response = await fetch(url, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options
   });
 
   const data = await response.json().catch(() => ({}));
+  // #region agent log
+  fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'api.js:request:response',message:'API request response',data:{url,status:response.status,ok:response.ok,message:data?.message,setCookie:response.headers.get('set-cookie')!=null},timestamp:Date.now(),hypothesisId:'C-D-E',runId:'pre-fix'})}).catch(()=>{});
+  // #endregion
   if (!response.ok) {
     if (response.status === 401) {
       window.dispatchEvent(new Event('ledger:unauthorized'));

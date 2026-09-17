@@ -41,6 +41,9 @@ const corsOptions = {
         if (!origin || allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'app.js:cors:rejected',message:'CORS origin rejected',data:{origin,allowedOrigins},timestamp:Date.now(),hypothesisId:'D',runId:'pre-fix'})}).catch(()=>{});
+        // #endregion
         callback(new Error('Origin is not allowed by CORS'));
     },
     credentials: true, // Allow cookies to be sent

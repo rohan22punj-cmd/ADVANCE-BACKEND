@@ -1,5 +1,16 @@
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
+const TOKEN_KEY = 'ledger_access_token';
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
 export class ApiError extends Error {
   constructor(message, status, data) {
     super(message);
@@ -10,21 +21,19 @@ export class ApiError extends Error {
 
 async function request(path, options = {}) {
   const url = `${API_URL}${path}`;
-  // #region agent log
-  fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'api.js:request:start',message:'API request start',data:{url,method:options.method||'GET',apiUrl:API_URL},timestamp:Date.now(),hypothesisId:'D-E',runId:'pre-fix'})}).catch(()=>{});
-  // #endregion
+  const token = getToken();
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(url, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options
+    ...options,
+    headers
   });
 
   const data = await response.json().catch(() => ({}));
-  // #region agent log
-  fetch('http://127.0.0.1:7896/ingest/2b2c0b13-d65c-462e-b0c9-28761c706c36',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a58762'},body:JSON.stringify({sessionId:'a58762',location:'api.js:request:response',message:'API request response',data:{url,status:response.status,ok:response.ok,message:data?.message,setCookie:response.headers.get('set-cookie')!=null},timestamp:Date.now(),hypothesisId:'C-D-E',runId:'pre-fix'})}).catch(()=>{});
-  // #endregion
   if (!response.ok) {
     if (response.status === 401) {
+      setToken(null);
       window.dispatchEvent(new Event('ledger:unauthorized'));
     }
     throw new ApiError(data.message || 'Something went wrong. Please try again.', response.status, data);
@@ -33,9 +42,20 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  register: (body) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
-  login: (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
-  logout: () => request('/auth/logout', { method: 'POST' }),
+  register: async (body) => {
+    const data = await request('/auth/register', { method: 'POST', body: JSON.stringify(body) });
+    if (data.accessToken) setToken(data.accessToken);
+    return data;
+  },
+  login: async (body) => {
+    const data = await request('/auth/login', { method: 'POST', body: JSON.stringify(body) });
+    if (data.accessToken) setToken(data.accessToken);
+    return data;
+  },
+  logout: () => {
+    setToken(null);
+    return request('/auth/logout', { method: 'POST' });
+  },
   accounts: () => request('/accounts'),
   createAccount: (currency) => request('/accounts', { method: 'POST', body: JSON.stringify({ currency }) }),
   balance: (accountId) => request(`/accounts/${accountId}`),

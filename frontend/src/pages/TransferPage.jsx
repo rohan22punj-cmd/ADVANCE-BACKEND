@@ -78,6 +78,9 @@ export function TransferPage() {
     [accounts, form.fromAccountId, sourceAccount?.currency]
   );
 
+  // Debounced lookup ref
+  const lookupTimeoutRef = useRef(null);
+
   const sourceBalance = sourceAccount ? balances[sourceAccount._id] || 0 : 0;
   const numAmount = parseFloat(form.amount) || 0;
   const remainingSourceBalance = sourceBalance - numAmount;

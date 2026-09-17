@@ -9,7 +9,10 @@ import {
   Copy,
   Check,
   ReceiptText,
-  AlertCircle
+  AlertCircle,
+  UserCheck,
+  XCircle,
+  Loader2
 } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -34,6 +37,12 @@ export function TransferPage() {
   const [completedTx, setCompletedTx] = useState(null);
   const [copiedTxId, setCopiedTxId] = useState(false);
   const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState(crypto.randomUUID());
+  
+  // Recipient lookup & confirmation state
+  const [recipient, setRecipient] = useState(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     async function fetchAccounts() {
@@ -74,14 +83,49 @@ export function TransferPage() {
   const remainingSourceBalance = sourceBalance - numAmount;
   const isOverdrawn = numAmount > sourceBalance;
 
+  // Lookup recipient when toAccountId changes
+  useEffect(() => {
+    if (!form.toAccountId || !sourceAccount) {
+      setRecipient(null);
+      setShowConfirm(false);
+      return;
+    }
+
+    let cancelled = false;
+    async function lookupRecipient() {
+      setLookupLoading(true);
+      try {
+        const data = await api.lookupAccount(form.toAccountId);
+        if (!cancelled) {
+          setRecipient(data.account);
+          setShowConfirm(true);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setRecipient(null);
+          setShowConfirm(false);
+          toast.error(err.message || 'Failed to verify recipient account');
+        }
+      } finally {
+        if (!cancelled) setLookupLoading(false);
+      }
+    }
+    lookupRecipient();
+    return () => { cancelled = true; };
+  }, [form.toAccountId, sourceAccount]);
+
   async function submit(event) {
     event.preventDefault();
     if (isOverdrawn) {
       toast.error('Insufficient funds in source account');
       return;
     }
+    if (!recipient) {
+      toast.error('Please select a valid destination account');
+      return;
+    }
     setError('');
-    setBusy(true);
+    setConfirming(true);
 
     try {
       const idempotencyKey = currentIdempotencyKey;
@@ -94,20 +138,33 @@ export function TransferPage() {
 
       toast.success('ACID Transfer completed and recorded in ledger.');
       setCompletedTx(res.transaction);
+      setShowConfirm(false);
       refreshAccounts();
     } catch (requestError) {
       setError(requestError.message);
       toast.error(requestError.message);
-      // Generate fresh idempotency key on error
       setCurrentIdempotencyKey(crypto.randomUUID());
     } finally {
-      setBusy(false);
+      setConfirming(false);
     }
+  }
+
+  function handleConfirmTransfer() {
+    // This is called from the confirmation step
+    // The actual submit is handled by the form onSubmit
+  }
+
+  function handleCancelConfirm() {
+    setShowConfirm(false);
+    setForm(current => ({ ...current, toAccountId: '' }));
+    setRecipient(null);
   }
 
   function handleReset() {
     setCompletedTx(null);
     setForm(current => ({ ...current, toAccountId: '', amount: '' }));
+    setRecipient(null);
+    setShowConfirm(false);
     setCurrentIdempotencyKey(crypto.randomUUID());
   }
 
@@ -277,7 +334,7 @@ export function TransferPage() {
                   <Select
                     id="to"
                     required
-                    disabled={!sourceAccount}
+                    disabled={!sourceAccount || lookupLoading}
                     value={form.toAccountId}
                     onChange={event => setForm({ ...form, toAccountId: event.target.value })}
                     className="bg-slate-950 border-slate-800 text-sm disabled:opacity-50"
@@ -289,12 +346,90 @@ export function TransferPage() {
                       </option>
                     ))}
                   </Select>
+                  {lookupLoading && (
+                    <div className="flex items-center gap-2 text-xs text-cyan-300">
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Verifying recipient account...</span>
+                    </div>
+                  )}
                   {sourceAccount && destinationOptions.length === 0 && (
                     <p className="text-xs text-amber-400 bg-amber-400/10 p-2 rounded border border-amber-400/20">
                       ⚠️ You need another active {sourceAccount.currency} account to receive this transfer. Create one in Dashboard.
                     </p>
                   )}
                 </div>
+
+                {/* Recipient Confirmation Step */}
+                {recipient && showConfirm && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-amber-500/20 text-amber-400">
+                        <UserCheck size={20} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-amber-300">Confirm Recipient Details</h3>
+                        <p className="text-xs text-slate-400">Please verify the recipient before proceeding</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Account Holder</span>
+                        <span className="font-semibold text-white">{recipient.holderName}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Account ID</span>
+                        <span className="font-mono text-slate-200">{recipient.maskedId}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Currency</span>
+                        <span className="font-medium text-cyan-300">{recipient.currency}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Status</span>
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-500/20">
+                          {recipient.status.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-xs text-slate-400">
+                        Sending: <span className="font-bold text-white">{formatMoney(numAmount, sourceAccount?.currency || 'INR')}</span>
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCancelConfirm}
+                          className="border-slate-700 text-slate-300 hover:bg-slate-800 text-sm"
+                          size="sm"
+                        >
+                          <XCircle size={13} className="mr-1" />
+                          Change
+                        </Button>
+                        <Button
+                          type="submit"
+                          className="bg-amber-500 text-slate-950 font-semibold hover:bg-amber-400 text-sm"
+                          size="sm"
+                          disabled={confirming || busy || isOverdrawn}
+                        >
+                          {confirming ? (
+                            <span className="flex items-center gap-1.5">
+                              <Loader2 size={13} className="animate-spin" />
+                              Confirming...
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1.5">
+                              <Send size={13} />
+                              Confirm & Send
+                            </span>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Amount */}
                 <div className="space-y-2">
@@ -367,23 +502,25 @@ export function TransferPage() {
                   </p>
                 )}
 
-                <Button
-                  type="submit"
-                  className="w-full bg-cyan-400 text-slate-950 font-semibold hover:bg-cyan-300"
-                  disabled={busy || !form.toAccountId || !form.amount || isOverdrawn}
-                >
-                  {busy ? (
-                    <span className="flex items-center gap-2">
-                      <RefreshCw size={15} className="animate-spin" />
-                      Acquiring Locks & Processing ACID Transaction...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      Send {form.amount ? `${formatMoney(numAmount, sourceAccount?.currency || 'INR')}` : 'Transfer'}
-                      <Send size={15} />
-                    </span>
-                  )}
-                </Button>
+                {!showConfirm && (
+                  <Button
+                    type="submit"
+                    className="w-full bg-cyan-400 text-slate-950 font-semibold hover:bg-cyan-300"
+                    disabled={busy || !form.toAccountId || !form.amount || isOverdrawn || !recipient}
+                  >
+                    {busy ? (
+                      <span className="flex items-center gap-2">
+                        <RefreshCw size={15} className="animate-spin" />
+                        Acquiring Locks & Processing ACID Transaction...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        Send {form.amount ? `${formatMoney(numAmount, sourceAccount?.currency || 'INR')}` : 'Transfer'}
+                        <Send size={15} />
+                      </span>
+                    )}
+                  </Button>
+                )}
               </form>
             )}
           </CardContent>

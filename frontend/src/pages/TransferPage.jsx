@@ -86,9 +86,11 @@ export function TransferPage() {
   const remainingSourceBalance = sourceBalance - numAmount;
   const isOverdrawn = numAmount > sourceBalance;
 
-  // Lookup recipient when toAccountId changes
+  // Lookup recipient when toAccountId changes (debounced - only for valid ObjectId format)
   useEffect(() => {
-    if (!form.toAccountId || !sourceAccount) {
+    const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+    
+    if (!form.toAccountId || !sourceAccount || !objectIdRegex.test(form.toAccountId)) {
       setRecipient(null);
       setShowConfirm(false);
       return;
@@ -113,8 +115,8 @@ export function TransferPage() {
         if (!cancelled) setLookupLoading(false);
       }
     }
-    lookupRecipient();
-    return () => { cancelled = true; };
+    const timeoutId = setTimeout(lookupRecipient, 300);
+    return () => { cancelled = true; clearTimeout(timeoutId); };
   }, [form.toAccountId, sourceAccount]);
 
   async function submit(event) {
@@ -334,30 +336,33 @@ export function TransferPage() {
                 {/* To Account */}
                 <div className="space-y-2">
                   <Label htmlFor="to" className="text-xs text-slate-300">To Account (Destination)</Label>
-                  <Select
-                    id="to"
-                    required
-                    disabled={!sourceAccount || lookupLoading}
-                    value={form.toAccountId}
-                    onChange={event => setForm({ ...form, toAccountId: event.target.value })}
-                    className="bg-slate-950 border-slate-800 text-sm disabled:opacity-50"
-                  >
-                    <option value="">Select destination account</option>
-                    {destinationOptions.filter(acc => acc.status === 'active').map(acc => (
-                      <option key={acc._id} value={acc._id}>
-                        {accountLabel(acc)}
-                      </option>
-                    ))}
-                  </Select>
-                  {lookupLoading && (
-                    <div className="flex items-center gap-2 text-xs text-cyan-300">
-                      <Loader2 size={14} className="animate-spin" />
-                      <span>Verifying recipient account...</span>
-                    </div>
-                  )}
-                  {sourceAccount && destinationOptions.length === 0 && (
+                  <div className="relative">
+                    <Input
+                      id="to"
+                      required
+                      disabled={!sourceAccount || lookupLoading}
+                      value={form.toAccountId}
+                      onChange={event => setForm({ ...form, toAccountId: event.target.value })}
+                      onBlur={() => {
+                        // Trigger immediate lookup on blur (user finished typing)
+                        if (form.toAccountId && sourceAccount && !lookupLoading) {
+                          setShowConfirm(true);
+                        }
+                      }}
+                      placeholder="Enter recipient account ID (24-char hex)"
+                      className="bg-slate-950 border-slate-800 text-sm font-mono disabled:opacity-50"
+                    />
+                    {lookupLoading && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs text-cyan-300">
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Verifying...</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">Enter any account ID in the system. Recipient details will appear below for confirmation.</p>
+                  {sourceAccount && destinationOptions.length === 0 && accounts.length > 1 && (
                     <p className="text-xs text-amber-400 bg-amber-400/10 p-2 rounded border border-amber-400/20">
-                      ⚠️ You need another active {sourceAccount.currency} account to receive this transfer. Create one in Dashboard.
+                      ⚠️ No other accounts in your name match this currency. Enter another user's account ID to transfer.
                     </p>
                   )}
                 </div>
@@ -509,7 +514,7 @@ export function TransferPage() {
                   <Button
                     type="submit"
                     className="w-full bg-cyan-400 text-slate-950 font-semibold hover:bg-cyan-300"
-                    disabled={busy || !form.toAccountId || !form.amount || isOverdrawn || !recipient}
+                    disabled={busy || !form.toAccountId || !form.amount || isOverdrawn}
                   >
                     {busy ? (
                       <span className="flex items-center gap-2">

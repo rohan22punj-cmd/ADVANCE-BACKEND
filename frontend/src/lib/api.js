@@ -39,6 +39,7 @@ export const api = {
   accounts: () => request('/accounts'),
   createAccount: (currency) => request('/accounts', { method: 'POST', body: JSON.stringify({ currency }) }),
   balance: (accountId) => request(`/accounts/${accountId}`),
+  lookupAccount: (accountId) => request(`/accounts/lookup/${accountId}`),
   transfer: (body) => request('/transactions', { method: 'POST', body: JSON.stringify(body) }),
   demoFund: (accountId) => request('/demo/fund', { method: 'POST', body: JSON.stringify({ accountId }) }),
   reverseTransaction: (transactionId, body) => request(`/transactions/${transactionId}/reverse`, { method: 'POST', body: JSON.stringify(body) }),

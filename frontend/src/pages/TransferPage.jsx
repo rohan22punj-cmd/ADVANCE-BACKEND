@@ -201,63 +201,63 @@ export function TransferPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       {/* Header */}
-      <section className="border-b border-slate-800/80 pb-5">
+      <section className="border-b border-banking-border pb-5">
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-semibold text-cyan-300">
-            <Zap size={13} className="text-cyan-400" />
+          <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary">
+            <Zap size={13} />
             ACID Multi-Document Transfer
           </span>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Execute Financial Transfer</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-banking-text">Execute Financial Transfer</h1>
+        <p className="mt-1 text-sm text-banking-textMuted">
           Every transfer atomically creates a Debit journal entry on sender and Credit journal entry on recipient under Redis mutex lock.
         </p>
       </section>
 
       {/* Success Receipt Card */}
       {completedTx ? (
-        <Card className="border-emerald-500/30 bg-slate-900/90 shadow-2xl">
+        <Card className="border-success/30 bg-success-light shadow-cardHover">
           <CardContent className="p-6 space-y-6">
             <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-emerald-500/20 text-emerald-400">
+              <div className="grid h-12 w-12 place-items-center rounded-lg bg-success-light text-success">
                 <CheckCircle2 size={26} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Transfer Completed Successfully</h2>
-                <p className="text-xs text-slate-400">ACID multi-document transaction committed to WiredTiger replica set</p>
+                <h2 className="text-xl font-bold text-banking-text">Transfer Completed Successfully</h2>
+                <p className="text-xs text-banking-textMuted">ACID multi-document transaction committed to WiredTiger replica set</p>
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4 space-y-3">
+            <div className="rounded-md border border-banking-border bg-white p-4 space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Transaction ID</span>
-                <div className="flex items-center gap-1.5 font-mono text-slate-200">
+                <span className="text-banking-textMuted">Transaction ID</span>
+                <div className="flex items-center gap-1.5 font-mono text-banking-text">
                   <span>{completedTx._id}</span>
                   <button
                     type="button"
                     onClick={() => copyTxId(completedTx._id)}
-                    className="text-slate-400 hover:text-cyan-300"
+                    className="text-banking-textLight hover:text-primary"
                   >
-                    {copiedTxId ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                    {copiedTxId ? <Check size={13} className="text-success" /> : <Copy size={13} />}
                   </button>
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Transferred Amount</span>
-                <span className="font-bold text-emerald-400 text-sm">
+                <span className="text-banking-textMuted">Transferred Amount</span>
+                <span className="font-bold text-success text-sm">
                   {formatMoney(completedTx.amount, sourceAccount?.currency || 'INR')}
                 </span>
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Idempotency Key</span>
-                <span className="font-mono text-slate-400">{shortId(completedTx.idempotencyKey)}</span>
+                <span className="text-banking-textMuted">Idempotency Key</span>
+                <span className="font-mono text-banking-textLight">{shortId(completedTx.idempotencyKey)}</span>
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Status</span>
-                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-300 border border-emerald-500/20">
+                <span className="text-banking-textMuted">Status</span>
+                <span className="inline-flex items-center rounded-full bg-success-light px-2 py-0.5 text-xs font-semibold text-success border border-success/30">
                   COMPLETED (2 Ledger Entries)
                 </span>
               </div>
@@ -267,13 +267,12 @@ export function TransferPage() {
               <Button
                 variant="outline"
                 onClick={handleReset}
-                className="border-slate-700 text-slate-300 hover:bg-slate-800"
               >
                 New Transfer
               </Button>
               <Button
                 onClick={() => navigate('/transactions')}
-                className="bg-cyan-400 text-slate-950 font-semibold hover:bg-cyan-300 flex items-center justify-center gap-1.5"
+                className="bg-primary hover:bg-primary-hover flex items-center justify-center gap-1.5"
               >
                 <ReceiptText size={16} />
                 View in Activity
@@ -283,21 +282,21 @@ export function TransferPage() {
         </Card>
       ) : (
         /* Transfer Form Card */
-        <Card className="border-slate-800/80 bg-slate-900/80 shadow-xl">
+        <Card className="shadow-cardHover">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg text-slate-100">Transaction Parameters</CardTitle>
+            <CardTitle className="text-lg text-banking-text">Transaction Parameters</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="space-y-4">
-                <div className="h-10 animate-pulse rounded-md bg-slate-800/60" />
-                <div className="h-10 animate-pulse rounded-md bg-slate-800/60" />
-                <div className="h-10 animate-pulse rounded-md bg-slate-800/60" />
+                <div className="h-10 animate-pulse rounded-md border-banking-border bg-banking-bg" />
+                <div className="h-10 animate-pulse rounded-md border-banking-border bg-banking-bg" />
+                <div className="h-10 animate-pulse rounded-md border-banking-border bg-banking-bg" />
               </div>
             ) : accounts.length === 0 ? (
               <div className="text-center py-8 space-y-3">
-                <AlertCircle className="mx-auto text-amber-400" size={32} />
-                <p className="text-sm text-slate-300">No accounts found. Create accounts in Dashboard first.</p>
+                <AlertCircle className="mx-auto text-accent-gold" size={32} />
+                <p className="text-sm text-banking-textMuted">No accounts found. Create accounts in Dashboard first.</p>
                 <Button onClick={() => navigate('/dashboard')} size="sm">Go to Dashboard</Button>
               </div>
             ) : (
@@ -305,9 +304,9 @@ export function TransferPage() {
                 {/* From Account */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="from" className="text-xs text-slate-300">From Account (Source)</Label>
+                    <Label htmlFor="from">From Account (Source)</Label>
                     {sourceAccount && (
-                      <span className="text-xs font-medium text-cyan-300">
+                      <span className="text-xs font-medium text-primary">
                         Available: {formatMoney(sourceBalance, sourceAccount.currency)}
                       </span>
                     )}
@@ -317,7 +316,6 @@ export function TransferPage() {
                     required
                     value={form.fromAccountId}
                     onChange={event => setForm({ ...form, fromAccountId: event.target.value, toAccountId: '' })}
-                    className="bg-slate-950 border-slate-800 text-sm"
                   >
                     <option value="">Select source account</option>
                     {accounts.filter(acc => acc.status === 'active').map(acc => (
@@ -329,13 +327,13 @@ export function TransferPage() {
                 </div>
 
                 {/* Arrow Divider */}
-                <div className="flex justify-center text-slate-600">
+                <div className="flex justify-center text-banking-textLight">
                   <ArrowRight size={18} />
                 </div>
 
                 {/* To Account */}
                 <div className="space-y-2">
-                  <Label htmlFor="to" className="text-xs text-slate-300">To Account (Destination)</Label>
+                  <Label htmlFor="to">To Account (Destination)</Label>
                   <div className="relative">
                     <Input
                       id="to"
@@ -350,67 +348,66 @@ export function TransferPage() {
                         }
                       }}
                       placeholder="Enter recipient account ID (24-char hex)"
-                      className="bg-slate-950 border-slate-800 text-sm font-mono disabled:opacity-50"
+                      className="font-mono disabled:opacity-50"
                     />
                     {lookupLoading && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs text-cyan-300">
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs text-primary">
                         <Loader2 size={14} className="animate-spin" />
                         <span>Verifying...</span>
                       </div>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500">Enter any account ID in the system. Recipient details will appear below for confirmation.</p>
+                  <p className="text-[11px] text-banking-textLight">Enter any account ID in the system. Recipient details will appear below for confirmation.</p>
                   {sourceAccount && destinationOptions.length === 0 && accounts.length > 1 && (
-                    <p className="text-xs text-amber-400 bg-amber-400/10 p-2 rounded border border-amber-400/20">
-                      ⚠️ No other accounts in your name match this currency. Enter another user's account ID to transfer.
+                    <p className="text-xs text-accent-gold bg-[#FEF9E7] p-2 rounded border border-accent-gold/30">
+                      No other accounts in your name match this currency. Enter another user's account ID to transfer.
                     </p>
                   )}
                 </div>
 
                 {/* Recipient Confirmation Step */}
                 {recipient && showConfirm && (
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                  <div className="rounded-lg border border-accent-gold/30 bg-[#FEF9E7] p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-10 w-10 place-items-center rounded-full bg-amber-500/20 text-amber-400">
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-accent-gold/20 text-accent-gold">
                         <UserCheck size={20} />
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-amber-300">Confirm Recipient Details</h3>
-                        <p className="text-xs text-slate-400">Please verify the recipient before proceeding</p>
+                        <h3 className="text-sm font-semibold text-accent-gold">Confirm Recipient Details</h3>
+                        <p className="text-xs text-banking-textMuted">Please verify the recipient before proceeding</p>
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 space-y-2 text-sm">
+                    <div className="rounded-md border border-banking-border bg-white p-3 space-y-2 text-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Account Holder</span>
-                        <span className="font-semibold text-white">{recipient.holderName}</span>
+                        <span className="text-banking-textMuted">Account Holder</span>
+                        <span className="font-semibold text-banking-text">{recipient.holderName}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Account ID</span>
-                        <span className="font-mono text-slate-200">{recipient.maskedId}</span>
+                        <span className="text-banking-textMuted">Account ID</span>
+                        <span className="font-mono text-banking-text">{recipient.maskedId}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Currency</span>
-                        <span className="font-medium text-cyan-300">{recipient.currency}</span>
+                        <span className="text-banking-textMuted">Currency</span>
+                        <span className="font-medium text-primary">{recipient.currency}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Status</span>
-                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-500/20">
+                        <span className="text-banking-textMuted">Status</span>
+                        <span className="inline-flex items-center rounded-full bg-success-light px-2 py-0.5 text-[10px] font-semibold text-success border border-success/30">
                           {recipient.status.toUpperCase()}
                         </span>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-2">
-                      <span className="text-xs text-slate-400">
-                        Sending: <span className="font-bold text-white">{formatMoney(numAmount, sourceAccount?.currency || 'INR')}</span>
+                      <span className="text-xs text-banking-textMuted">
+                        Sending: <span className="font-bold text-banking-text">{formatMoney(numAmount, sourceAccount?.currency || 'INR')}</span>
                       </span>
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
                           variant="outline"
                           onClick={handleCancelConfirm}
-                          className="border-slate-700 text-slate-300 hover:bg-slate-800 text-sm"
                           size="sm"
                         >
                           <XCircle size={13} className="mr-1" />
@@ -418,7 +415,7 @@ export function TransferPage() {
                         </Button>
                         <Button
                           type="submit"
-                          className="bg-amber-500 text-slate-950 font-semibold hover:bg-amber-400 text-sm"
+                          variant="secondary"
                           size="sm"
                           disabled={confirming || busy || isOverdrawn}
                         >
@@ -442,27 +439,27 @@ export function TransferPage() {
                 {/* Amount */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="amount" className="text-xs text-slate-300">Amount ({sourceAccount?.currency || 'INR'})</Label>
+                    <Label htmlFor="amount">Amount ({sourceAccount?.currency || 'INR'})</Label>
                     {sourceBalance > 0 && (
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleQuickAmount(50)}
-                          className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-slate-700"
+                          className="rounded bg-banking-bg px-2 py-0.5 text-[10px] text-banking-textMuted hover:bg-banking-border"
                         >
                           +50
                         </button>
                         <button
                           type="button"
                           onClick={() => handleQuickAmount(100)}
-                          className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-slate-700"
+                          className="rounded bg-banking-bg px-2 py-0.5 text-[10px] text-banking-textMuted hover:bg-banking-border"
                         >
                           +100
                         </button>
                         <button
                           type="button"
                           onClick={handleMaxAmount}
-                          className="rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 hover:bg-cyan-500/30"
+                          className="rounded bg-primary-light px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
                         >
                           MAX
                         </button>
@@ -479,14 +476,12 @@ export function TransferPage() {
                     value={form.amount}
                     onChange={event => setForm({ ...form, amount: event.target.value })}
                     placeholder="0.00"
-                    className={`bg-slate-950 border-slate-800 text-base font-semibold ${
-                      isOverdrawn ? 'border-rose-500 focus:border-rose-500 text-rose-300' : ''
-                    }`}
+                    className={`${isOverdrawn ? 'border-debit focus:border-debit focus:ring-debit/15' : ''}`}
                   />
                   {numAmount > 0 && sourceAccount && (
-                    <div className="flex justify-between text-[11px] pt-1 text-slate-400">
+                    <div className="flex justify-between text-[11px] pt-1 text-banking-textLight">
                       <span>Remaining balance after transfer:</span>
-                      <span className={isOverdrawn ? 'text-rose-400 font-semibold' : 'text-slate-200'}>
+                      <span className={isOverdrawn ? 'text-debit font-semibold' : 'text-banking-text'}>
                         {formatMoney(remainingSourceBalance, sourceAccount.currency)}
                       </span>
                     </div>
@@ -494,18 +489,18 @@ export function TransferPage() {
                 </div>
 
                 {/* Idempotency & Concurrency Footnote */}
-                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3 space-y-1 text-xs text-slate-400">
-                  <div className="flex items-center gap-2 text-cyan-300 font-medium">
+                <div className="rounded-md border border-banking-border bg-banking-bg p-3 space-y-1 text-xs text-banking-textLight">
+                  <div className="flex items-center gap-2 text-primary font-medium">
                     <ShieldCheck size={15} />
                     <span>Double-Spend & Concurrency Guard</span>
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Protected by Redis Mutex (<code className="text-slate-400">SET NX PX 5000</code>) and Idempotency key: <span className="font-mono text-slate-400">{shortId(currentIdempotencyKey)}</span>
+                  <p className="text-[11px] text-banking-textLight">
+                    Protected by Redis Mutex (<code className="text-banking-textMuted">SET NX PX 5000</code>) and Idempotency key: <span className="font-mono text-banking-textMuted">{shortId(currentIdempotencyKey)}</span>
                   </p>
                 </div>
 
                 {error && (
-                  <p role="alert" className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                  <p role="alert" className="rounded-md border border-debit/30 bg-debit-light px-3 py-2 text-xs text-debit">
                     {error}
                   </p>
                 )}
@@ -513,7 +508,7 @@ export function TransferPage() {
                 {!showConfirm && (
                   <Button
                     type="submit"
-                    className="w-full bg-cyan-400 text-slate-950 font-semibold hover:bg-cyan-300"
+                    className="w-full"
                     disabled={busy || !form.toAccountId || !form.amount || isOverdrawn}
                   >
                     {busy ? (

@@ -1,24 +1,12 @@
 import { useEffect, useState } from 'react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  ReceiptText,
-  RotateCcw,
-  Copy,
-  Check,
-  Filter,
-  ShieldCheck,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Info
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, ReceiptText, RotateCcw, Copy, Check, Filter, ShieldCheck, ArrowUpRight, ArrowDownLeft, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
 import { useLedger } from '../App';
 import { formatMoney, shortId } from '../lib/utils';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
-import { Card, CardContent } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogClose, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input, Label, Select } from '../components/ui/input';
 
@@ -127,34 +115,25 @@ export function TransactionsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-800/80 pb-5">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-semibold text-cyan-300">
-              <ShieldCheck size={13} className="text-cyan-400" />
-              Immutable Audit Trail
-            </span>
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Transaction History</h1>
-          <p className="mt-1 text-sm text-slate-400">
-            A comprehensive, verifiable journal of every credit, debit, and double-entry reversal.
-          </p>
+          <h1 className="font-heading text-2xl font-bold text-banking-text">Transaction History</h1>
+          <p className="mt-1 text-sm text-banking-textMuted">Comprehensive, verifiable journal of every credit, debit, and double-entry reversal</p>
         </div>
-      </section>
+      </div>
 
       {/* Account & Filter Controls */}
-      <Card className="border-slate-800/80 bg-slate-900/80 shadow-md">
+      <Card className="hover:shadow-cardHover transition-shadow">
         <CardContent className="p-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {/* Account Selector */}
             <div className="space-y-1.5">
-              <Label htmlFor="history-account" className="text-xs text-slate-300">Target Account</Label>
+              <Label htmlFor="history-account">Target Account</Label>
               <Select
                 id="history-account"
                 value={selectedAccount}
                 onChange={event => changeAccount(event.target.value)}
-                className="bg-slate-950 border-slate-800 text-sm"
               >
                 {accounts.map(account => (
                   <option key={account._id} value={account._id}>
@@ -166,12 +145,11 @@ export function TransactionsPage() {
 
             {/* Status Selector */}
             <div className="space-y-1.5">
-              <Label htmlFor="history-status" className="text-xs text-slate-300">Filter by Status</Label>
+              <Label htmlFor="history-status">Filter by Status</Label>
               <Select
                 id="history-status"
                 value={status}
                 onChange={event => changeStatus(event.target.value)}
-                className="bg-slate-950 border-slate-800 text-sm"
               >
                 <option value="">All Statuses</option>
                 <option value="completed">Completed (Committed)</option>
@@ -181,10 +159,10 @@ export function TransactionsPage() {
               </Select>
             </div>
 
-            {/* Quick Helper Badge */}
+            {/* Quick Helper */}
             <div className="hidden lg:flex flex-col justify-end">
-              <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5 text-xs text-slate-400 flex items-center gap-2">
-                <Info size={15} className="text-cyan-400 flex-shrink-0" />
+              <div className="rounded-md border border-accent-gold/30 bg-[#FEF9E7] p-3 text-xs text-amber-800 flex items-center gap-2">
+                <Info size={15} className="text-accent-gold flex-shrink-0" />
                 <span>Reversals write new inverse ledger entries without modifying past records.</span>
               </div>
             </div>
@@ -193,43 +171,48 @@ export function TransactionsPage() {
       </Card>
 
       {/* Main Table / State */}
-      <Card className="border-slate-800/80 bg-slate-900/80 shadow-xl overflow-hidden">
+      <Card className="overflow-hidden hover:shadow-cardHover transition-shadow">
+        <CardHeader className="border-b border-banking-border">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className="text-lg">Transactions for {currentAccountObj ? `${currentAccountObj.currency} — ${shortId(currentAccountObj._id)}` : 'Account'}</CardTitle>
+          </div>
+        </CardHeader>
         <CardContent className="p-0">
           {error ? (
-            <div className="p-6 text-sm text-rose-300 bg-rose-500/10 border border-rose-500/20 m-5 rounded-lg">
+            <div className="m-5 p-4 rounded-md border border-debit/30 bg-debit-light text-sm text-debit">
               {error}
             </div>
           ) : loading ? (
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-3">
               {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="h-12 animate-pulse rounded-md bg-slate-800/40" />
+                <div key={i} className="h-10 animate-pulse rounded-md border-banking-border bg-banking-bg" />
               ))}
             </div>
           ) : data.transactions.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-slate-800/60 text-slate-500 mb-3">
+              <div className="grid h-12 w-12 place-items-center rounded-lg border-banking-border bg-banking-bg text-banking-textLight mb-3">
                 <ReceiptText size={24} />
               </div>
-              <p className="font-semibold text-slate-200">No transactions found</p>
-              <p className="mt-1 text-xs text-slate-500 max-w-sm">
-                Activity for account <span className="font-mono text-slate-400">{shortId(selectedAccount)}</span> will appear here once transfers are executed.
+              <p className="font-medium text-banking-text">No transactions found</p>
+              <p className="mt-1 text-sm text-banking-textLight max-w-sm">
+                Activity for account <span className="font-mono text-banking-textMuted">{shortId(selectedAccount)}</span> will appear here once transfers are executed.
               </p>
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[700px] text-left text-sm">
-                  <thead className="border-b border-slate-800/80 bg-slate-950/50 text-[11px] uppercase tracking-wider text-slate-400">
+                  <thead className="bg-banking-bg border-b border-banking-border text-xs uppercase tracking-wider text-banking-textMuted">
                     <tr>
-                      <th className="px-5 py-3.5 font-semibold">Date & Time</th>
-                      <th className="px-5 py-3.5 font-semibold">Transaction ID</th>
-                      <th className="px-5 py-3.5 font-semibold">Type & Counterparty</th>
-                      <th className="px-5 py-3.5 font-semibold text-right">Amount</th>
-                      <th className="px-5 py-3.5 font-semibold text-center">Status</th>
-                      <th className="px-5 py-3.5 font-semibold text-right">Actions</th>
+                      <th className="px-5 py-3.5 font-medium">Date & Time</th>
+                      <th className="px-5 py-3.5 font-medium">Transaction ID</th>
+                      <th className="px-5 py-3.5 font-medium">Type & Counterparty</th>
+                      <th className="px-5 py-3.5 font-medium text-right">Amount</th>
+                      <th className="px-5 py-3.5 font-medium text-center">Status</th>
+                      <th className="px-5 py-3.5 font-medium text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-banking-border">
                     {data.transactions.map(transaction => {
                       const fromAccId = String(transaction.fromAccount?._id || transaction.fromAccount);
                       const toAccId = String(transaction.toAccount?._id || transaction.toAccount);
@@ -246,40 +229,40 @@ export function TransactionsPage() {
                       return (
                         <tr
                           key={transaction._id}
-                          className="transition-colors hover:bg-slate-800/30 text-slate-300"
+                          className="transition-colors hover:bg-banking-bg text-banking-text"
                         >
                           {/* Date */}
-                          <td className="px-5 py-4 text-xs text-slate-400 whitespace-nowrap">
-                            <p className="font-medium text-slate-200">
+                          <td className="px-5 py-4 text-xs text-banking-textMuted whitespace-nowrap">
+                            <p className="font-medium text-banking-text">
                               {new Date(transaction.createdAt).toLocaleDateString(undefined, {
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric'
                               })}
                             </p>
-                            <p className="text-[10px] text-slate-500 font-mono">
+                            <p className="text-[10px] text-banking-textLight font-mono">
                               {new Date(transaction.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           </td>
 
                           {/* Tx ID & Idempotency Key */}
                           <td className="px-5 py-4">
-                            <div className="flex items-center gap-1 font-mono text-xs text-slate-300">
+                            <div className="flex items-center gap-1 font-mono text-xs text-banking-textMuted">
                               <span>{shortId(transaction._id)}</span>
                               <button
                                 type="button"
                                 onClick={() => copyText(transaction._id, transaction._id)}
-                                className="text-slate-500 hover:text-cyan-300"
+                                className="text-banking-textLight hover:text-primary"
                                 title="Copy Transaction ID"
                               >
                                 {copiedId === transaction._id ? (
-                                  <Check size={12} className="text-emerald-400" />
+                                  <Check size={12} className="text-success" />
                                 ) : (
                                   <Copy size={12} />
                                 )}
                               </button>
                             </div>
-                            <p className="text-[10px] text-slate-500 font-mono truncate max-w-[140px]" title={transaction.idempotencyKey}>
+                            <p className="text-[10px] text-banking-textLight font-mono truncate max-w-[140px]" title={transaction.idempotencyKey}>
                               Key: {shortId(transaction.idempotencyKey)}
                             </p>
                           </td>
@@ -290,17 +273,17 @@ export function TransactionsPage() {
                               <span
                                 className={`grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${
                                   isOutgoing
-                                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    ? 'bg-debit-light text-debit border border-debit/30'
+                                    : 'bg-success-light text-success border border-success/30'
                                 }`}
                               >
                                 {isOutgoing ? <ArrowUpRight size={13} /> : <ArrowDownLeft size={13} />}
                               </span>
                               <div>
-                                <p className="text-xs font-medium text-slate-200">
+                                <p className="text-xs font-medium text-banking-text">
                                   {isOutgoing ? 'Debit (Outgoing)' : 'Credit (Incoming)'}
                                 </p>
-                                <p className="font-mono text-[11px] text-slate-500">
+                                <p className="font-mono text-[11px] text-banking-textLight">
                                   {shortId(counterpartyId)}
                                 </p>
                               </div>
@@ -308,10 +291,10 @@ export function TransactionsPage() {
                           </td>
 
                           {/* Amount */}
-                          <td className="px-5 py-4 text-right">
+                          <td className="px-5 py-4 text-right tabular-nums">
                             <span
-                              className={`font-bold text-sm ${
-                                isOutgoing ? 'text-slate-200' : 'text-emerald-400'
+                              className={`font-semibold text-sm ${
+                                isOutgoing ? 'text-banking-text' : 'text-success'
                               }`}
                             >
                               {isOutgoing ? '−' : '+'}{formatMoney(transaction.amount, currency)}
@@ -330,15 +313,15 @@ export function TransactionsPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openReversal(transaction)}
-                                className="h-7 px-2.5 text-xs text-amber-300 border-amber-400/30 bg-amber-400/5 hover:bg-amber-400/15 hover:border-amber-400/50"
+                                className="h-7 px-2.5 text-xs text-accent-gold border-accent-gold/30 bg-[#FEF9E7] hover:bg-[#FDF2C1] hover:border-accent-gold/50"
                               >
                                 <RotateCcw size={12} className="mr-1" />
                                 Reverse
                               </Button>
                             ) : transaction.status === 'reversed' ? (
-                              <span className="text-[11px] text-slate-500 italic">Reversed</span>
+                              <span className="text-[11px] text-banking-textLight italic">Reversed</span>
                             ) : (
-                              <span className="text-[11px] text-slate-600">—</span>
+                              <span className="text-[11px] text-banking-textLight">—</span>
                             )}
                           </td>
                         </tr>
@@ -349,10 +332,10 @@ export function TransactionsPage() {
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between border-t border-slate-800/80 px-5 py-4 bg-slate-950/40">
-                <p className="text-xs text-slate-400">
-                  Page <span className="font-semibold text-white">{pagination.page || 1}</span> of{' '}
-                  <span className="font-semibold text-white">{Math.max(1, pagination.totalPages || 0)}</span>
+              <div className="flex items-center justify-between border-t border-banking-border px-5 py-4 bg-banking-bg">
+                <p className="text-xs text-banking-textMuted">
+                  Page <span className="font-medium text-banking-text">{pagination.page || 1}</span> of{' '}
+                  <span className="font-medium text-banking-text">{Math.max(1, pagination.totalPages || 0)}</span>
                   <span className="hidden sm:inline"> ({pagination.total || 0} total records)</span>
                 </p>
                 <div className="flex gap-2">
@@ -361,7 +344,7 @@ export function TransactionsPage() {
                     size="sm"
                     disabled={!pagination.hasPrevPage}
                     onClick={() => setPage(current => current - 1)}
-                    className="h-8 text-xs border-slate-800"
+                    className="h-8 text-xs"
                   >
                     <ChevronLeft size={14} />
                     Previous
@@ -371,7 +354,7 @@ export function TransactionsPage() {
                     size="sm"
                     disabled={!pagination.hasNextPage}
                     onClick={() => setPage(current => current + 1)}
-                    className="h-8 text-xs border-slate-800"
+                    className="h-8 text-xs"
                   >
                     Next
                     <ChevronRight size={14} />
@@ -387,11 +370,11 @@ export function TransactionsPage() {
       <Dialog open={reversalModalOpen} onClose={() => setReversalModalOpen(false)}>
         <DialogHeader>
           <div>
-            <DialogTitle className="text-lg text-white flex items-center gap-2">
-              <RotateCcw size={18} className="text-amber-400" />
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw size={18} className="text-accent-gold" />
               Reverse Transaction
             </DialogTitle>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-sm text-banking-textMuted">
               Double-entry offset: This creates inverse debit & credit journal entries without mutating past ledger records.
             </p>
           </div>
@@ -400,46 +383,35 @@ export function TransactionsPage() {
 
         {targetTx && (
           <form onSubmit={handleConfirmReversal} className="space-y-4">
-            <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 space-y-2 text-xs">
+            <div className="rounded-md border border-banking-border bg-banking-bg p-3 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-400">Amount to Refund:</span>
-                <span className="font-bold text-amber-300">
+                <span className="text-banking-textMuted">Amount to Refund:</span>
+                <span className="font-semibold text-accent-gold">
                   {formatMoney(targetTx.amount, currentAccountObj?.currency || 'INR')}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Original Transaction:</span>
-                <span className="font-mono text-slate-300">{shortId(targetTx._id)}</span>
+                <span className="text-banking-textMuted">Original Transaction:</span>
+                <span className="font-mono text-banking-text">{shortId(targetTx._id)}</span>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="reversal-reason" className="text-xs text-slate-300">Reason for Reversal</Label>
+              <Label htmlFor="reversal-reason">Reason for Reversal</Label>
               <Input
                 id="reversal-reason"
                 required
                 value={reversalReason}
                 onChange={e => setReversalReason(e.target.value)}
                 placeholder="e.g., Accidental duplicate payment"
-                className="bg-slate-950 border-slate-800 text-sm"
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setReversalModalOpen(false)}
-                className="text-xs border-slate-700"
-              >
+            <div className="flex justify-end gap-2 pt-3 border-t border-banking-border">
+              <Button variant="outline" size="sm" onClick={() => setReversalModalOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={reversing}
-                className="text-xs bg-amber-400 text-slate-950 font-semibold hover:bg-amber-300"
-              >
+              <Button type="submit" size="sm" disabled={reversing}>
                 {reversing ? 'Reversing...' : 'Execute Reversal'}
               </Button>
             </div>

@@ -1,17 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  CirclePlus,
-  RefreshCw,
-  WalletCards,
-  Copy,
-  Check,
-  ArrowUpRight,
-  PlusCircle,
-  ShieldAlert,
-  Zap,
-  Layers,
-  Coins
-} from 'lucide-react';
+import { CirclePlus, RefreshCw, WalletCards, Copy, Check, ArrowUpRight, PlusCircle, ShieldAlert, Zap, Layers, Coins, Home, CreditCard, History, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
@@ -19,7 +7,7 @@ import { useLedger } from '../App';
 import { formatMoney, shortId } from '../lib/utils';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
-import { Card, CardContent } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogClose, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Label, Select } from '../components/ui/input';
 
@@ -103,81 +91,63 @@ export function DashboardPage() {
     .reduce((sum, acc) => sum + (acc.balance || 0), 0);
 
   return (
-    <div className="space-y-8">
-      {/* Top Banner / Hero */}
-      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-800/80 pb-6">
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-semibold text-cyan-300">
-              <Zap size={13} className="text-cyan-400" />
-              Redis Distributed Mutex Active
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
-              <Layers size={13} className="text-emerald-400" />
-              Double-Entry Invariant: PASS
-            </span>
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Accounts & Ledger Overview</h1>
-          <p className="mt-1 text-sm text-slate-400">
-            Real-time balance aggregation computed directly from immutable ledger audit trails.
-          </p>
+          <h1 className="font-heading text-2xl font-bold text-banking-text">Dashboard</h1>
+          <p className="mt-1 text-sm text-banking-textMuted">Real-time balance aggregation from immutable ledger audit trails</p>
         </div>
-
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadAccounts}
-            disabled={loading}
-            aria-label="Refresh balances"
-            className="border-slate-800 text-slate-300 hover:text-white"
-          >
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={loadAccounts} disabled={loading} aria-label="Refresh balances">
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             Refresh
           </Button>
-          <Button
-            onClick={() => setModalOpen(true)}
-            size="sm"
-            className="bg-cyan-400 text-slate-950 font-semibold hover:bg-cyan-300 shadow-md shadow-cyan-400/20"
-          >
+          <Button onClick={() => setModalOpen(true)} size="sm">
             <CirclePlus size={16} />
             Create Account
           </Button>
         </div>
-      </section>
+      </div>
 
       {/* Summary KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Total Active Accounts</span>
-            <WalletCards size={18} className="text-slate-500" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-white">{accounts.length}</p>
-          <p className="mt-1 text-xs text-slate-500">Separated by currency pools</p>
-        </div>
+        <Card className="hover:shadow-cardHover transition-shadow">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-banking-textMuted">Total Active Accounts</span>
+              <WalletCards size={20} className="text-primary" />
+            </div>
+            <p className="mt-2 font-heading text-3xl font-bold text-banking-text">{accounts.length}</p>
+            <p className="mt-1 text-xs text-banking-textLight">Separated by currency pools</p>
+          </CardContent>
+        </Card>
 
-        <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">INR Ledger Balance</span>
-            <Coins size={18} className="text-cyan-400" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-cyan-300">{formatMoney(totalBalanceINR, 'INR')}</p>
-          <p className="mt-1 text-xs text-slate-500">Aggregate sum of credits − debits</p>
-        </div>
+        <Card className="hover:shadow-cardHover transition-shadow">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-banking-textMuted">INR Ledger Balance</span>
+              <Coins size={20} className="text-primary" />
+            </div>
+            <p className="mt-2 font-heading text-3xl font-bold text-banking-text">{formatMoney(totalBalanceINR, 'INR')}</p>
+            <p className="mt-1 text-xs text-banking-textLight">Aggregate sum of credits − debits</p>
+          </CardContent>
+        </Card>
 
-        <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Consistency Guarantee</span>
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          </div>
-          <p className="mt-2 text-base font-semibold text-emerald-300">ACID + Fast Idempotency</p>
-          <p className="mt-1 text-xs text-slate-500">395 RPS Contention Protection</p>
-        </div>
+        <Card className="hover:shadow-cardHover transition-shadow">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-banking-textMuted">Consistency Guarantee</span>
+              <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+            </div>
+            <p className="mt-2 font-medium text-success">ACID + Fast Idempotency</p>
+            <p className="mt-1 text-xs text-banking-textLight">High-concurrency contention protection</p>
+          </CardContent>
+        </Card>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300 flex items-center gap-3">
+        <div className="rounded-md border border-debit/30 bg-debit-light p-4 text-sm text-debit flex items-center gap-3">
           <ShieldAlert size={18} />
           <span>{error}</span>
         </div>
@@ -185,33 +155,33 @@ export function DashboardPage() {
 
       {/* Accounts Grid */}
       {loading ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map(item => (
-            <div key={item} className="h-52 animate-pulse rounded-xl border border-slate-800/70 bg-slate-900/50" />
+            <Card key={item} className="animate-pulse h-44 border-banking-border bg-banking-bg" />
           ))}
         </div>
       ) : accounts.length === 0 ? (
-        <Card className="border-dashed border-slate-800 bg-slate-900/30">
+        <Card className="border-dashed border-banking-border bg-banking-bg">
           <CardContent className="flex min-h-64 flex-col items-center justify-center text-center p-8">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-slate-800/70 text-cyan-400 mb-4">
+            <div className="grid h-14 w-14 place-items-center rounded-lg bg-primary-light text-primary mb-4">
               <WalletCards size={28} />
             </div>
-            <h2 className="text-lg font-semibold text-slate-200">No accounts created yet</h2>
-            <p className="mt-1 max-w-md text-sm text-slate-400">
+            <h2 className="text-lg font-semibold text-banking-text">No accounts created yet</h2>
+            <p className="mt-1 max-w-md text-sm text-banking-textMuted">
               Create your first financial account to start transferring funds, testing idempotency, and observing ACID ledger journal entries.
             </p>
-            <Button className="mt-5 bg-cyan-400 text-slate-950 font-semibold" onClick={() => setModalOpen(true)}>
+            <Button className="mt-5" onClick={() => setModalOpen(true)}>
               <PlusCircle size={16} />
               Open Your First Account
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {accounts.map(account => (
             <Card
               key={account._id}
-              className="group relative overflow-hidden border-slate-800/80 bg-slate-900/80 transition-all hover:border-slate-700 hover:shadow-lg hover:shadow-cyan-500/5"
+              className="overflow-hidden border-banking-border bg-white transition-shadow hover:shadow-cardHover"
             >
               <CardContent className="p-5 flex flex-col justify-between h-full">
                 {/* Top Row: Currency & Status */}
@@ -219,23 +189,23 @@ export function DashboardPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-bold text-white tracking-wide">
+                        <span className="font-heading text-lg font-semibold text-banking-text">
                           {account.currency} Account
                         </span>
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 uppercase">
+                        <span className="rounded bg-banking-bg px-2 py-0.5 text-[10px] font-medium text-banking-textMuted uppercase">
                           v{account.version || 0}
                         </span>
                       </div>
                       <div className="mt-1 flex items-center gap-1.5">
-                        <span className="font-mono text-xs text-slate-500">{shortId(account._id)}</span>
+                        <span className="font-mono text-xs text-banking-textLight">{shortId(account._id)}</span>
                         <button
                           type="button"
                           onClick={() => copyAccountId(account._id)}
-                          className="text-slate-500 hover:text-cyan-300 transition-colors"
+                          className="text-banking-textLight hover:text-primary transition-colors"
                           title="Copy Full Account ID"
                         >
                           {copiedId === account._id ? (
-                            <Check size={13} className="text-emerald-400" />
+                            <Check size={13} className="text-success" />
                           ) : (
                             <Copy size={13} />
                           )}
@@ -246,47 +216,47 @@ export function DashboardPage() {
                   </div>
 
                   {/* Balance Display */}
-                  <div className="mt-6 mb-2">
-                    <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Available Balance</p>
-                    <p className="mt-1 text-3xl font-extrabold tracking-tight text-slate-100">
+                  <div className="mt-5">
+                    <p className="text-xs font-medium uppercase tracking-wider text-banking-textMuted">Available Balance</p>
+                    <p className="mt-1 font-heading text-3xl font-bold text-banking-text tabular-nums">
                       {formatMoney(account.balance, account.currency)}
                     </p>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-[11px] text-banking-textLight">
                       Calculated from {account.currency} ledger entries
                     </p>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="mt-6 grid grid-cols-2 gap-2 pt-4 border-t border-slate-800/60">
+                <div className="mt-5 grid grid-cols-2 gap-2 pt-4 border-t border-banking-border">
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     disabled={fundingId === account._id}
                     onClick={() => addDemoFunds(account._id, account.currency)}
-                    className="text-xs border-slate-700/80 bg-slate-950/40 hover:bg-slate-800 hover:text-emerald-300 hover:border-emerald-500/40"
+                    className="text-xs"
                   >
                     {fundingId === account._id ? (
                       <span className="flex items-center gap-1.5">
-                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-success border-t-transparent" />
                         Adding...
                       </span>
                     ) : (
                       <span className="flex items-center gap-1">
-                        <PlusCircle size={13} className="text-emerald-400" />
+                        <PlusCircle size={13} className="text-success" />
                         +1,000 Funds
                       </span>
                     )}
                   </Button>
 
                   <Button
-                    variant="secondary"
+                    variant="outline"
                     size="sm"
                     onClick={() => navigate(`/transfer?from=${account._id}`)}
-                    className="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-300 flex items-center justify-center gap-1"
+                    className="text-xs"
                   >
                     <span>Transfer</span>
-                    <ArrowUpRight size={14} />
+                    <ArrowUpRight size={13} />
                   </Button>
                 </div>
               </CardContent>
@@ -299,8 +269,8 @@ export function DashboardPage() {
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)}>
         <DialogHeader>
           <div>
-            <DialogTitle className="text-lg text-white">Create New Account</DialogTitle>
-            <p className="mt-1 text-xs text-slate-400">
+            <DialogTitle>Create New Account</DialogTitle>
+            <p className="mt-1 text-sm text-banking-textMuted">
               Choose the denomination currency for this new ledger account.
             </p>
           </div>
@@ -309,12 +279,11 @@ export function DashboardPage() {
 
         <form onSubmit={createAccount} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="currency" className="text-xs text-slate-300">Currency</Label>
+            <Label htmlFor="currency">Currency</Label>
             <Select
               id="currency"
               value={currency}
               onChange={event => setCurrency(event.target.value)}
-              className="bg-slate-950 border-slate-800 text-sm"
             >
               {currencies.map(curr => (
                 <option key={curr.code} value={curr.code}>
@@ -322,26 +291,16 @@ export function DashboardPage() {
                 </option>
               ))}
             </Select>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-banking-textLight">
               Transfers are restricted to accounts within the same currency to maintain ledger invariants.
             </p>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setModalOpen(false)}
-              className="text-xs border-slate-700"
-            >
+          <div className="flex justify-end gap-2 pt-3 border-t border-banking-border">
+            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={creating}
-              className="text-xs bg-cyan-400 text-slate-950 font-semibold hover:bg-cyan-300"
-            >
+            <Button type="submit" size="sm" disabled={creating}>
               {creating ? 'Creating...' : 'Open Account'}
             </Button>
           </div>

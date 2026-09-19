@@ -7,8 +7,8 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input, Label } from '../components/ui/input';
 
-export function LoginPage({ onAuthenticated }) {
-  const [mode, setMode] = useState('login');
+export function LoginPage({ onAuthenticated, mode: initialMode = 'login' }) {
+  const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

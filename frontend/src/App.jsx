@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { api } from './lib/api';
 import { AppShell } from './components/AppShell';
+import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TransferPage } from './pages/TransferPage';
@@ -11,8 +12,13 @@ const LedgerContext = createContext(null);
 export const useLedger = () => useContext(LedgerContext);
 
 function Protected({ authenticated, onLogout, children }) {
-  if (!authenticated) return <Navigate to="/" replace />;
+  if (!authenticated) return <Navigate to="/login" replace />;
   return <AppShell onLogout={onLogout}>{children}</AppShell>;
+}
+
+function PublicOnly({ authenticated, children }) {
+  if (authenticated) return <Navigate to="/dashboard" replace />;
+  return children;
 }
 
 export default function App() {
@@ -34,7 +40,9 @@ export default function App() {
 
   return <LedgerContext.Provider value={context}>
     <Routes>
-      <Route path="/" element={authenticated === true ? <Navigate to="/dashboard" replace /> : <LoginPage onAuthenticated={() => setAuthenticated(true)} />} />
+      <Route path="/" element={authenticated === true ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+      <Route path="/login" element={<PublicOnly authenticated={authenticated}><LoginPage onAuthenticated={() => setAuthenticated(true)} /></PublicOnly>} />
+      <Route path="/register" element={<PublicOnly authenticated={authenticated}><LoginPage onAuthenticated={() => setAuthenticated(true)} mode="register" /></PublicOnly>} />
       <Route path="/dashboard" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><DashboardPage /></Protected>} />
       <Route path="/transfer" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><TransferPage /></Protected>} />
       <Route path="/transactions" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><TransactionsPage /></Protected>} />

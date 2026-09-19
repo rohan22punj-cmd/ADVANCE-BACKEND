@@ -32,11 +32,9 @@ export default function App() {
   const refreshAccounts = useCallback(() => setRefreshVersion(version => version + 1), []);
   const context = { refreshVersion, refreshAccounts };
 
-  if (authenticated === null) return <div className="grid min-h-screen place-items-center bg-slate-950 text-sm text-slate-400">Checking your secure session...</div>;
-
   return <LedgerContext.Provider value={context}>
     <Routes>
-      <Route path="/" element={authenticated ? <Navigate to="/dashboard" replace /> : <LoginPage onAuthenticated={() => setAuthenticated(true)} />} />
+      <Route path="/" element={authenticated === true ? <Navigate to="/dashboard" replace /> : <LoginPage onAuthenticated={() => setAuthenticated(true)} />} />
       <Route path="/dashboard" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><DashboardPage /></Protected>} />
       <Route path="/transfer" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><TransferPage /></Protected>} />
       <Route path="/transactions" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><TransactionsPage /></Protected>} />

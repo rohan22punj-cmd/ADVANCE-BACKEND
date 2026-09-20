@@ -571,6 +571,48 @@ async function reverseTransaction(req, res, next) {
             });
         }
 
+        if (originalTransaction.status === 'reversed') {
+            return res.status(400).json({ message: 'Transaction already reversed' });
+        }
+
+        // Verify original transaction has both ledger legs (debit + credit)
+        const originalLedger = await ledgerModel.find({
+            transaction: originalTransaction._id
+        });
+
+        if (originalLedger.length !== 2) {
+            return res.status(400).json({
+                message: 'Original transaction ledger entries are inconsistent – manual review required'
+            });
+        }
+
+        const debitLeg = originalLedger.find(e => e.type === 'debit');
+        const creditLeg = originalLedger.find(e => e.type === 'credit');
+
+        if (!debitLeg || !creditLeg) {
+            return res.status(400).json({
+                message: 'Original transaction ledger entries are inconsistent – manual review required'
+            });
+        }
+
+        if (debitLeg.account.toString() !== originalTransaction.fromAccount._id.toString()) {
+            return res.status(400).json({
+                message: 'Original transaction ledger entries are inconsistent – manual review required'
+            });
+        }
+
+        if (creditLeg.account.toString() !== originalTransaction.toAccount._id.toString()) {
+            return res.status(400).json({
+                message: 'Original transaction ledger entries are inconsistent – manual review required'
+            });
+        }
+
+        if (debitLeg.amount !== originalTransaction.amount || creditLeg.amount !== originalTransaction.amount) {
+            return res.status(400).json({
+                message: 'Original transaction ledger entries are inconsistent – manual review required'
+            });
+        }
+
         // Populate full account details with user info
         await originalTransaction.fromAccount.populate('user', 'name email');
         await originalTransaction.toAccount.populate('user', 'name email');
@@ -659,6 +701,29 @@ async function reverseTransaction(req, res, next) {
             const txBalance = txBalanceAgg.length > 0 ? txBalanceAgg[0].balance : 0;
             if (txBalance < originalTransaction.amount) {
                 throw new Error(`Insufficient funds for reversal: required ${originalTransaction.amount}, available ${txBalance}`);
+            }
+
+            // Verify ledger legs still exist inside the transaction session
+            const sessionLedger = await ledgerModel.find({
+                transaction: originalTransaction._id
+            }).session(session);
+
+            if (sessionLedger.length !== 2) {
+                throw new Error('Original transaction ledger entries are inconsistent – manual review required');
+            }
+
+            const sessionDebit = sessionLedger.find(e => e.type === 'debit');
+            const sessionCredit = sessionLedger.find(e => e.type === 'credit');
+
+            if (!sessionDebit || !sessionCredit) {
+                throw new Error('Original transaction ledger entries are inconsistent – manual review required');
+            }
+
+            if (sessionDebit.account.toString() !== originalTransaction.fromAccount._id.toString() ||
+                sessionCredit.account.toString() !== originalTransaction.toAccount._id.toString() ||
+                sessionDebit.amount !== originalTransaction.amount ||
+                sessionCredit.amount !== originalTransaction.amount) {
+                throw new Error('Original transaction ledger entries are inconsistent – manual review required');
             }
 
             // Create reversal transaction record

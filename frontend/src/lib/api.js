@@ -1,6 +1,7 @@
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 const TOKEN_KEY = 'ledger_access_token';
+const USER_KEY = 'ledger_user';
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -10,6 +11,18 @@ function setToken(token) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
 }
+
+function getUser() {
+  const raw = localStorage.getItem(USER_KEY);
+  try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+
+function setUser(user) {
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  else localStorage.removeItem(USER_KEY);
+}
+
+export { getUser };
 
 export class ApiError extends Error {
   constructor(message, status, data) {
@@ -45,15 +58,18 @@ export const api = {
   register: async (body) => {
     const data = await request('/auth/register', { method: 'POST', body: JSON.stringify(body) });
     if (data.accessToken) setToken(data.accessToken);
+    if (data.user) setUser(data.user);
     return data;
   },
   login: async (body) => {
     const data = await request('/auth/login', { method: 'POST', body: JSON.stringify(body) });
     if (data.accessToken) setToken(data.accessToken);
+    if (data.user) setUser(data.user);
     return data;
   },
   logout: () => {
     setToken(null);
+    setUser(null);
     return request('/auth/logout', { method: 'POST' });
   },
   accounts: () => request('/accounts'),

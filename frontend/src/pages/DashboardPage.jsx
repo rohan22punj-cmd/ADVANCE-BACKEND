@@ -99,7 +99,7 @@ export function DashboardPage() {
           <p className="mt-1 text-sm text-banking-textMuted">Real-time balance aggregation from immutable ledger audit trails</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={loadAccounts} disabled={loading} aria-label="Refresh balances">
+          <Button variant="secondary" size="sm" onClick={loadAccounts} disabled={loading} aria-label="Refresh balances">
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             Refresh
           </Button>
@@ -112,33 +112,39 @@ export function DashboardPage() {
 
       {/* Summary KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="hover:shadow-cardHover transition-shadow">
+        <Card className="border-l-4 border-accent-navy hover:shadow-cardHover transition-shadow">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-banking-textMuted">Total Active Accounts</span>
-              <WalletCards size={20} className="text-primary" />
+              <div className="p-2 rounded-full bg-blue-50 text-primary">
+                <WalletCards size={20} />
+              </div>
             </div>
-            <p className="mt-2 font-heading text-3xl font-bold text-banking-text">{accounts.length}</p>
+            <p className="mt-2 font-heading text-3xl font-bold text-accent-navy">{accounts.length}</p>
             <p className="mt-1 text-xs text-banking-textLight">Separated by currency pools</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-cardHover transition-shadow">
+        <Card className="border-l-4 border-primary hover:shadow-cardHover transition-shadow">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-banking-textMuted">INR Ledger Balance</span>
-              <Coins size={20} className="text-primary" />
+              <div className="p-2 rounded-full bg-brand-light text-primary">
+                <Coins size={20} />
+              </div>
             </div>
-            <p className="mt-2 font-heading text-3xl font-bold text-banking-text">{formatMoney(totalBalanceINR, 'INR')}</p>
+            <p className="mt-2 font-heading text-3xl font-bold text-primary">{formatMoney(totalBalanceINR, 'INR')}</p>
             <p className="mt-1 text-xs text-banking-textLight">Aggregate sum of credits − debits</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-cardHover transition-shadow">
+        <Card className="border-l-4 border-success hover:shadow-cardHover transition-shadow">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-banking-textMuted">Consistency Guarantee</span>
-              <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+              <div className="p-2 rounded-full bg-success-light">
+                <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+              </div>
             </div>
             <p className="mt-2 font-medium text-success">ACID + Fast Idempotency</p>
             <p className="mt-1 text-xs text-banking-textLight">High-concurrency contention protection</p>

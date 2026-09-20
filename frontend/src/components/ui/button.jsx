@@ -9,7 +9,7 @@ const buttonVariants = cva(
         primary: 'bg-primary text-white hover:bg-primary-hover shadow-sm hover:shadow-md',
         secondary: 'bg-white text-primary border border-primary hover:bg-primary-light',
         outline: 'border border-banking-border bg-white text-banking-text hover:bg-banking-bg',
-        ghost: 'text-banking-textMuted hover:bg-banking-bg hover:text-banking-text',
+        ghost: 'text-banking-text hover:bg-banking-bg',
         destructive: 'bg-debit text-white hover:bg-[#A82020] shadow-sm',
       },
       size: { default: '', sm: 'h-8 px-3 text-xs', lg: 'h-11 px-6 text-base', icon: 'h-10 w-10 px-0' }

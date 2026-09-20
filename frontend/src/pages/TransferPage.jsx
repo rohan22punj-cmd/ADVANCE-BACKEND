@@ -442,27 +442,30 @@ export function TransferPage() {
                     <Label htmlFor="amount">Amount ({sourceAccount?.currency || 'INR'})</Label>
                     {sourceBalance > 0 && (
                       <div className="flex items-center gap-1.5">
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleQuickAmount(50)}
-                          className="rounded bg-banking-bg px-2 py-0.5 text-[10px] text-banking-textMuted hover:bg-banking-border"
                         >
                           +50
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleQuickAmount(100)}
-                          className="rounded bg-banking-bg px-2 py-0.5 text-[10px] text-banking-textMuted hover:bg-banking-border"
                         >
                           +100
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="secondary"
+                          size="sm"
                           onClick={handleMaxAmount}
-                          className="rounded bg-primary-light px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
                         >
                           MAX
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>

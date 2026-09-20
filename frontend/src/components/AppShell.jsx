@@ -1,8 +1,8 @@
-import { Landmark, LayoutDashboard, LogOut, ReceiptText, Send, ShieldCheck, Menu, X } from 'lucide-react';
+import { Landmark, LayoutDashboard, LogOut, ReceiptText, Send, ShieldCheck, Menu, X, User, Mail, Copy, ChevronDown } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { api } from '../lib/api';
+import { api, getUser } from '../lib/api';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 
@@ -15,12 +15,45 @@ const navigation = [
 export function AppShell({ children, onLogout }) {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const u = getUser();
+    setUser(u);
+  }, []);
 
   async function logout() {
     try { await api.logout(); } catch {}
     onLogout();
     toast.success('You have been signed out.');
     navigate('/');
+  }
+
+  // close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function getInitials(name) {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2);
+  }
+
+  function copyAccountId() {
+    // We'll copy the first account ID if available; fallback to user id
+    // For simplicity, copy user._id
+    if (user?._id) {
+      navigator.clipboard.writeText(user._id);
+      toast.success('Account ID copied');
+    }
   }
 
   return (
@@ -63,12 +96,60 @@ export function AppShell({ children, onLogout }) {
             </nav>
           </div>
 
-          {/* Right: Status & Logout */}
+          {/* Right: Status, Profile Dropdown, Logout */}
           <div className="flex items-center gap-4">
             {/* Engine Status */}
             <div className="hidden lg:flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/90">
               <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
               <span>Engine: Online</span>
+            </div>
+
+            {/* Profile Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2 p-1 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="User menu"
+              >
+                <div className="h-8 w-8 rounded-full bg-accent-gold flex items-center justify-center text-primary font-medium text-sm">
+                  {user?.name ? getInitials(user.name) : '?'}
+                </div>
+                <ChevronDown size={16} className="text-white/80" />
+              </button>
+
+              {profileOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-md border border-banking-border bg-white shadow-cardHover py-1 z-50 animate-in fade-in-20 duration-150">
+                  <div className="px-4 py-3 border-b border-banking-border">
+                    <p className="font-medium text-banking-text">{user?.name || 'User'}</p>
+                    <p className="text-xs text-banking-textMuted">{user?.email || ''}</p>
+                  </div>
+                  <div className="px-4 py-2 text-xs text-banking-textMuted">
+                    <p>Account ID: <span className="font-mono text-banking-text">{user?._id || '—'}</span></p>
+                  </div>
+                  <div className="px-4 py-2 border-t border-banking-border flex items-center justify-between">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={copyAccountId}
+                      className="h-auto px-2 py-1 text-xs"
+                    >
+                      <Copy size={12} className="mr-1" />
+                      Copy
+                    </Button>
+                  </div>
+                  <div className="px-2 py-1">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      onClick={logout}
+                    >
+                      <LogOut size={13} className="mr-1.5" />
+                      Sign Out
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -79,15 +160,6 @@ export function AppShell({ children, onLogout }) {
             >
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={logout}
-            >
-              <LogOut size={14} className="mr-1.5" />
-              Sign Out
-            </Button>
           </div>
         </div>
 

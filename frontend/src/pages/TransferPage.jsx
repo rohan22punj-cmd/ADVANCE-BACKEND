@@ -41,6 +41,7 @@ export function TransferPage() {
   // Recipient lookup & confirmation state
   const [recipient, setRecipient] = useState(null);
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
@@ -92,6 +93,7 @@ export function TransferPage() {
     
     if (!form.toAccountId || !sourceAccount || !objectIdRegex.test(form.toAccountId)) {
       setRecipient(null);
+      setLookupError(null);
       setShowConfirm(false);
       return;
     }
@@ -99,17 +101,19 @@ export function TransferPage() {
     let cancelled = false;
     async function lookupRecipient() {
       setLookupLoading(true);
+      setLookupError(null);
       try {
         const data = await api.lookupAccount(form.toAccountId);
         if (!cancelled) {
           setRecipient(data.account);
+          setLookupError(null);
           setShowConfirm(true);
         }
       } catch (err) {
         if (!cancelled) {
           setRecipient(null);
+          setLookupError(err.message || 'Failed to verify recipient account');
           setShowConfirm(false);
-          toast.error(err.message || 'Failed to verify recipient account');
         }
       } finally {
         if (!cancelled) setLookupLoading(false);
@@ -125,8 +129,26 @@ export function TransferPage() {
       toast.error('Insufficient funds in source account');
       return;
     }
+    // Validation before sending
+    if (!form.toAccountId) {
+      toast.error('Enter a destination account ID');
+      return;
+    }
+    const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+    if (!objectIdRegex.test(form.toAccountId)) {
+      toast.error('Invalid account ID format (must be 24-character hex)');
+      return;
+    }
+    if (lookupLoading) {
+      toast.error('Verifying recipient, please wait...');
+      return;
+    }
+    if (lookupError) {
+      toast.error(lookupError);
+      return;
+    }
     if (!recipient) {
-      toast.error('Please select a valid destination account');
+      toast.error('Recipient not verified');
       return;
     }
     setError('');

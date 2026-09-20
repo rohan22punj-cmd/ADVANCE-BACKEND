@@ -38,6 +38,13 @@ export default {
           DEFAULT: '#C62828',
           light: '#FDEDEC',
         },
+        primary: {
+          DEFAULT: '#8B0000',
+          hover: '#610000',
+          light: '#B22222',
+          subtle: '#FCF6F6',
+          border: '#F3DADA'
+        },
         accent: {
           gold: '#C9A227',
           navy: '#1B3358',

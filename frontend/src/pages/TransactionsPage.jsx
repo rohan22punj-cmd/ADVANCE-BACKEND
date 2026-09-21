@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ReceiptText, RotateCcw, Copy, Check, Filter, ShieldCheck, ArrowUpRight, ArrowDownLeft, Info, Search, Calendar, DollarSign, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ReceiptText, Copy, Check, Filter, ShieldCheck, ArrowUpRight, ArrowDownLeft, Info, Search, Calendar, DollarSign, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
 import { useLedger } from '../App';
@@ -8,7 +8,6 @@ import { formatMoney, shortId } from '../lib/utils';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Dialog, DialogClose, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input, Label, Select } from '../components/ui/input';
 
 export function TransactionsPage() {
@@ -32,12 +31,6 @@ export function TransactionsPage() {
   const [maxAmount, setMaxAmount] = useState('');
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
-
-  // Reversal Modal State
-  const [reversalModalOpen, setReversalModalOpen] = useState(false);
-  const [targetTx, setTargetTx] = useState(null);
-  const [reversalReason, setReversalReason] = useState('Customer requested reversal / cancellation');
-  const [reversing, setReversing] = useState(false);
 
   // Sync URL query params to state on mount
   useEffect(() => {
@@ -155,33 +148,6 @@ export function TransactionsPage() {
     setCopiedId(id);
     toast.success('Copied to clipboard');
     setTimeout(() => setCopiedId(null), 2000);
-  }
-
-  function openReversal(transaction) {
-    setTargetTx(transaction);
-    setReversalReason('Accidental transfer / Customer cancellation');
-    setReversalModalOpen(true);
-  }
-
-  async function handleConfirmReversal(event) {
-    event.preventDefault();
-    if (!targetTx) return;
-    setReversing(true);
-    try {
-      const idempotencyKey = crypto.randomUUID();
-      await api.reverseTransaction(targetTx._id, {
-        reason: reversalReason,
-        idempotencyKey
-      });
-      toast.success('Transaction reversed! Offset ledger entries recorded.');
-      setReversalModalOpen(false);
-      refreshAccounts();
-      loadTransactions();
-    } catch (requestError) {
-      toast.error(requestError.message);
-    } finally {
-      setReversing(false);
-    }
   }
 
   const pagination = data.pagination || {};
@@ -384,11 +350,6 @@ export function TransactionsPage() {
                       const isReversal = transaction.type === 'reversal';
                       const counterpartyId = isOutgoing ? toAccId : fromAccId;
                       const currency = currentAccountObj?.currency || 'INR';
-                      const isEligibleForReversal =
-                        isOutgoing &&
-                        transaction.status === 'completed' &&
-                        !isReversal &&
-                        fromAccId !== toAccId;
 
                       return (
                         <tr
@@ -470,19 +431,9 @@ export function TransactionsPage() {
                             <Badge status={transaction.status} />
                           </td>
 
-                          {/* Actions (Reverse Button) */}
+                          {/* Actions */}
                           <td className="px-5 py-4 text-right">
-                            {isEligibleForReversal ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openReversal(transaction)}
-                                className="h-7 px-2.5 text-xs text-accent-gold border-accent-gold/30 bg-[#FEF9E7] hover:bg-[#FDF2C1] hover:border-accent-gold/50"
-                              >
-                                <RotateCcw size={12} className="mr-1" />
-                                Reverse
-                              </Button>
-                            ) : transaction.status === 'reversed' ? (
+                            {transaction.status === 'reversed' ? (
                               <span className="text-[11px] text-banking-textLight italic">Reversed</span>
                             ) : (
                               <span className="text-[11px] text-banking-textLight">—</span>
@@ -529,59 +480,6 @@ export function TransactionsPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Reversal Confirmation Dialog */}
-      <Dialog open={reversalModalOpen} onClose={() => setReversalModalOpen(false)}>
-        <DialogHeader>
-          <div>
-            <DialogTitle className="flex items-center gap-2">
-              <RotateCcw size={18} className="text-accent-gold" />
-              Reverse Transaction
-            </DialogTitle>
-            <p className="mt-1 text-sm text-banking-textMuted">
-              Double-entry offset: This creates inverse debit & credit journal entries without mutating past ledger records.
-            </p>
-          </div>
-          <DialogClose onClick={() => setReversalModalOpen(false)} />
-        </DialogHeader>
-
-        {targetTx && (
-          <form onSubmit={handleConfirmReversal} className="space-y-4">
-            <div className="rounded-md border border-banking-border bg-banking-bg p-3 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-banking-textMuted">Amount to Refund:</span>
-                <span className="font-semibold text-accent-gold">
-                  {formatMoney(targetTx.amount, currentAccountObj?.currency || 'INR')}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-banking-textMuted">Original Transaction:</span>
-                <span className="font-mono text-banking-text">{shortId(targetTx._id)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="reversal-reason">Reason for Reversal</Label>
-              <Input
-                id="reversal-reason"
-                required
-                value={reversalReason}
-                onChange={e => setReversalReason(e.target.value)}
-                placeholder="e.g., Accidental duplicate payment"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-banking-border">
-              <Button variant="outline" size="sm" onClick={() => setReversalModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" disabled={reversing}>
-                {reversing ? 'Reversing...' : 'Execute Reversal'}
-              </Button>
-            </div>
-          </form>
-        )}
-      </Dialog>
     </div>
   );
 }

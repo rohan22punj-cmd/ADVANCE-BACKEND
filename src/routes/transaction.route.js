@@ -9,8 +9,7 @@ const {
     validateQuery,
     createTransactionSchema,
     initialFundsSchema,
-    transactionQuerySchema,
-    reverseTransactionSchema
+    transactionQuerySchema
 } = require('../middleware/validate.middleware');
 
 // Transfer limiter: 20 requests per minute per user
@@ -31,8 +30,5 @@ router.post('/initial', authSystemUserMiddleware, validateBody(initialFundsSchem
 
 // Transaction history with pagination and filtering
 router.get('/', authMiddleware, validateQuery(transactionQuerySchema), transactionController.getTransactionHistory);
-
-// Reverse a completed transaction
-router.post('/:transactionId/reverse', authMiddleware, transferLimiter, validateBody(reverseTransactionSchema), transactionController.reverseTransaction);
 
 module.exports = router;

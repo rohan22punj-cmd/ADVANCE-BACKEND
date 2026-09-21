@@ -1,5 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
 const { authMiddleware, authSystemUserMiddleware } = require('../middleware/auth.middleware');
 const transactionController = require('../controllers/transactionController');
@@ -16,7 +17,7 @@ const {
 const transferLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
     max: 20,
-    keyGenerator: (req) => req.user?._id?.toString() || req.ip,
+    keyGenerator: (req) => req.user?._id?.toString() || ipKeyGenerator(req),
     message: { message: 'Too many transfer attempts, please try again in a minute' },
     standardHeaders: true,
     legacyHeaders: false,

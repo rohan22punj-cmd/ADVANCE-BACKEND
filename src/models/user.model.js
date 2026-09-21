@@ -28,6 +28,12 @@ const userSchema = new mongoose.Schema({
         immutable: true // Once set, this field cannot be changed
 
     },
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user',
+        immutable: false
+    },
     refreshTokens: [{
         token: {
             type: String,

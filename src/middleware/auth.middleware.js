@@ -46,7 +46,15 @@ async function authSystemUserMiddleware(req, res, next) {
     }
 }
 
+async function requireAdmin(req, res, next) {
+    if (!req.user || req.user.role !== 'admin') {
+        return next(new AppError('Forbidden: Admin access required', 403));
+    }
+    next();
+}
+
 module.exports = {
     authMiddleware,
-    authSystemUserMiddleware
+    authSystemUserMiddleware,
+    requireAdmin
 };

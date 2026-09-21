@@ -4,10 +4,12 @@ const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const { validateBody, registerSchema, loginSchema } = require('../middleware/validate.middleware');
 
-// Stricter limiter for registration: 5 requests per hour per IP
+const isTestEnv = process.env.NODE_ENV === 'test' || process.env.DISABLE_RATE_LIMIT === 'true';
+
+// Stricter limiter for registration: 5 requests per hour per IP (disabled in test)
 const registerLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5,
+    max: isTestEnv ? 100000 : 5,
     message: { message: 'Too many registration attempts, please try again in an hour' },
     standardHeaders: true,
     legacyHeaders: false,

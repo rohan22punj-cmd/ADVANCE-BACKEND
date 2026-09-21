@@ -7,12 +7,13 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TransferPage } from './pages/TransferPage';
 import { TransactionsPage } from './pages/TransactionsPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const LedgerContext = createContext(null);
 export const useLedger = () => useContext(LedgerContext);
 
 function Protected({ authenticated, onLogout, children }) {
-  if (!authenticated) return <Navigate to="/login" replace />;
+  if (!authenticated) return <Navigate to="/" replace />;
   return <AppShell onLogout={onLogout}>{children}</AppShell>;
 }
 
@@ -39,14 +40,16 @@ export default function App() {
   const context = { refreshVersion, refreshAccounts };
 
   return <LedgerContext.Provider value={context}>
-    <Routes>
-      <Route path="/" element={authenticated === true ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-      <Route path="/login" element={<PublicOnly authenticated={authenticated}><LoginPage onAuthenticated={() => setAuthenticated(true)} /></PublicOnly>} />
-      <Route path="/register" element={<PublicOnly authenticated={authenticated}><LoginPage onAuthenticated={() => setAuthenticated(true)} mode="register" /></PublicOnly>} />
-      <Route path="/dashboard" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><DashboardPage /></Protected>} />
-      <Route path="/transfer" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><TransferPage /></Protected>} />
-      <Route path="/transactions" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><TransactionsPage /></Protected>} />
-      <Route path="*" element={<Navigate to={authenticated ? '/dashboard' : '/'} replace />} />
-    </Routes>
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/" element={authenticated === true ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/login" element={<PublicOnly authenticated={authenticated}><LoginPage onAuthenticated={() => setAuthenticated(true)} /></PublicOnly>} />
+        <Route path="/register" element={<PublicOnly authenticated={authenticated}><LoginPage onAuthenticated={() => setAuthenticated(true)} mode="register" /></PublicOnly>} />
+        <Route path="/dashboard" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><DashboardPage /></Protected>} />
+        <Route path="/transfer" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><TransferPage /></Protected>} />
+        <Route path="/transactions" element={<Protected authenticated={authenticated} onLogout={() => setAuthenticated(false)}><TransactionsPage /></Protected>} />
+        <Route path="*" element={<Navigate to={authenticated ? '/dashboard' : '/'} replace />} />
+      </Routes>
+    </ErrorBoundary>
   </LedgerContext.Provider>;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CirclePlus, RefreshCw, WalletCards, Copy, Check, ArrowUpRight, PlusCircle, ShieldAlert, Zap, Layers, Coins, Home, CreditCard, History, TrendingUp } from 'lucide-react';
+import { CirclePlus, RefreshCw, WalletCards, Copy, Check, ArrowUpRight, PlusCircle, ShieldAlert, Coins } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
@@ -37,11 +37,31 @@ export function DashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const { accounts: list } = await api.accounts();
-      const balances = await Promise.all(list.map(account => api.balance(account._id)));
-      setAccounts(list.map((account, index) => ({ ...account, ...balances[index] })));
+      const response = await api.accounts();
+      const list = response?.accounts || [];
+      
+      if (list.length === 0) {
+        setAccounts([]);
+        setLoading(false);
+        return;
+      }
+      
+      const balances = await Promise.all(
+        list.map(account => 
+          api.balance(account._id).catch(err => {
+            console.error(`Failed to fetch balance for ${account._id}:`, err);
+            return { balance: 0 };
+          })
+        )
+      );
+      
+      setAccounts(list.map((account, index) => ({ 
+        ...account, 
+        ...(balances[index] || { balance: 0 }) 
+      })));
     } catch (requestError) {
-      setError(requestError.message);
+      setError(requestError.message || 'Failed to load accounts');
+      setAccounts([]);
     } finally {
       setLoading(false);
     }
@@ -86,7 +106,8 @@ export function DashboardPage() {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
-  const totalBalanceINR = accounts
+  const safeAccounts = accounts || [];
+  const totalBalanceINR = safeAccounts
     .filter(acc => acc.currency === 'INR')
     .reduce((sum, acc) => sum + (acc.balance || 0), 0);
 
@@ -120,7 +141,7 @@ export function DashboardPage() {
                 <WalletCards size={20} />
               </div>
             </div>
-            <p className="mt-2 font-heading text-3xl font-bold text-accent-navy">{accounts.length}</p>
+            <p className="mt-2 font-heading text-3xl font-bold text-accent-navy">{safeAccounts.length}</p>
             <p className="mt-1 text-xs text-banking-textLight">Separated by currency pools</p>
           </CardContent>
         </Card>
@@ -138,18 +159,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-success hover:shadow-cardHover transition-shadow">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-banking-textMuted">Consistency Guarantee</span>
-              <div className="p-2 rounded-full bg-success-light">
-                <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-              </div>
-            </div>
-            <p className="mt-2 font-medium text-success">ACID + Fast Idempotency</p>
-            <p className="mt-1 text-xs text-banking-textLight">High-concurrency contention protection</p>
-          </CardContent>
-        </Card>
+        
       </div>
 
       {error && (
@@ -166,7 +176,7 @@ export function DashboardPage() {
             <Card key={item} className="animate-pulse h-44 border-banking-border bg-banking-bg" />
           ))}
         </div>
-      ) : accounts.length === 0 ? (
+      ) : safeAccounts.length === 0 ? (
         <Card className="border-dashed border-banking-border bg-banking-bg">
           <CardContent className="flex min-h-64 flex-col items-center justify-center text-center p-8">
             <div className="grid h-14 w-14 place-items-center rounded-lg bg-primary-light text-primary mb-4">
@@ -184,7 +194,7 @@ export function DashboardPage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {accounts.map(account => (
+          {safeAccounts.map(account => (
             <Card
               key={account._id}
               className="overflow-hidden border-banking-border bg-white transition-shadow hover:shadow-cardHover"

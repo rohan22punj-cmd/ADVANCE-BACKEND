@@ -17,7 +17,6 @@ jest.mock('../service/GmailService', () => ({
 describe('Comprehensive API Test Suite', () => {
     beforeAll(async () => {
         process.env.JWT_SECRET = 'test-secret-suite';
-        process.env.NODE_ENV = 'test';
         await connect();
     });
 
@@ -128,8 +127,9 @@ describe('Comprehensive API Test Suite', () => {
             expect(res.body.message).toMatch(/Invalid password/i);
         });
 
-        test('Refresh token -> Success with cookie or body', async () => {
-            const regRes = await request(app)
+        test('Refresh token -> Success with cookie', async () => {
+            const agent = request.agent(app);
+            const regRes = await agent
                 .post('/api/auth/register')
                 .send({
                     name: 'Refresh Test',
@@ -137,18 +137,18 @@ describe('Comprehensive API Test Suite', () => {
                     password: 'password123'
                 });
 
-            const refreshToken = regRes.body.refreshToken;
+            expect(regRes.status).toBe(201);
 
-            const refreshRes = await request(app)
-                .post('/api/auth/refresh-token')
-                .send({ refreshToken });
+            const refreshRes = await agent
+                .post('/api/auth/refresh-token');
 
             expect(refreshRes.status).toBe(200);
             expect(refreshRes.body.accessToken).toBeDefined();
         });
 
         test('Logout -> clears refresh token', async () => {
-            const regRes = await request(app)
+            const agent = request.agent(app);
+            const regRes = await agent
                 .post('/api/auth/register')
                 .send({
                     name: 'Logout Test',
@@ -156,11 +156,11 @@ describe('Comprehensive API Test Suite', () => {
                     password: 'password123'
                 });
 
+            expect(regRes.status).toBe(201);
             const refreshToken = regRes.body.refreshToken;
 
-            const logoutRes = await request(app)
-                .post('/api/auth/logout')
-                .send({ refreshToken });
+            const logoutRes = await agent
+                .post('/api/auth/logout');
 
             expect(logoutRes.status).toBe(200);
 

@@ -31,4 +31,7 @@ router.post('/initial', authSystemUserMiddleware, validateBody(initialFundsSchem
 // Transaction history with pagination and filtering
 router.get('/', authMiddleware, validateQuery(transactionQuerySchema), transactionController.getTransactionHistory);
 
+// Transaction reversal (user-initiated)
+router.post('/:id/reverse', authMiddleware, transactionController.reverseTransaction);
+
 module.exports = router;

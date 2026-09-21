@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   ArrowRight,
   Send,
-  Zap,
   ShieldCheck,
   CheckCircle2,
   RefreshCw,
@@ -224,12 +223,6 @@ export function TransferPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       {/* Header */}
       <section className="border-b border-banking-border pb-5">
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary">
-            <Zap size={13} />
-            ACID Multi-Document Transfer
-          </span>
-        </div>
         <h1 className="font-heading text-2xl font-bold tracking-tight text-banking-text">Execute Financial Transfer</h1>
         <p className="mt-1 text-sm text-banking-textMuted">
           Every transfer atomically creates a Debit journal entry on sender and Credit journal entry on recipient under Redis mutex lock.

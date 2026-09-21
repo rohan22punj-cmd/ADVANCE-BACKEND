@@ -197,7 +197,6 @@ export function AppShell({ children, onLogout }) {
       <footer className="border-t border-banking-border py-4 text-center text-sm text-banking-textLight">
         <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>Ledgerline Double-Entry Financial Engine</span>
-          <span className="text-xs text-banking-textLight">Node.js • Express • MongoDB Replica Set • Redis • React</span>
         </div>
       </footer>
     </div>

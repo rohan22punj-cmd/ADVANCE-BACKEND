@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const { authMiddleware, authSystemUserMiddleware } = require('../middleware/auth.middleware');
 const transactionController = require('../controllers/transactionController');
@@ -11,8 +12,18 @@ const {
     reverseTransactionSchema
 } = require('../middleware/validate.middleware');
 
+// Transfer limiter: 20 requests per minute per user
+const transferLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 20,
+    keyGenerator: (req) => req.user?._id?.toString() || req.ip,
+    message: { message: 'Too many transfer attempts, please try again in a minute' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 // User-to-user transfer
-router.post('/', authMiddleware, validateBody(createTransactionSchema), transactionController.createTransaction);
+router.post('/', authMiddleware, transferLimiter, validateBody(createTransactionSchema), transactionController.createTransaction);
 
 // System user initial funds injection
 router.post('/initial', authSystemUserMiddleware, validateBody(initialFundsSchema), transactionController.createInitialfundsTransaction);
@@ -21,6 +32,6 @@ router.post('/initial', authSystemUserMiddleware, validateBody(initialFundsSchem
 router.get('/', authMiddleware, validateQuery(transactionQuerySchema), transactionController.getTransactionHistory);
 
 // Reverse a completed transaction
-router.post('/:transactionId/reverse', authMiddleware, validateBody(reverseTransactionSchema), transactionController.reverseTransaction);
+router.post('/:transactionId/reverse', authMiddleware, transferLimiter, validateBody(reverseTransactionSchema), transactionController.reverseTransaction);
 
 module.exports = router;

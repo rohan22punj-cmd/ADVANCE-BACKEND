@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, ReceiptText, RotateCcw, Copy, Check, Filter, ShieldCheck, ArrowUpRight, ArrowDownLeft, Info } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, ReceiptText, RotateCcw, Copy, Check, Filter, ShieldCheck, ArrowUpRight, ArrowDownLeft, Info, Search, Calendar, DollarSign, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
 import { useLedger } from '../App';
@@ -12,6 +13,9 @@ import { Input, Label, Select } from '../components/ui/input';
 
 export function TransactionsPage() {
   const { refreshAccounts } = useLedger();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState('');
   const [status, setStatus] = useState('');
@@ -21,18 +25,55 @@ export function TransactionsPage() {
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null);
 
+  // New filter states
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [type, setType] = useState('');
+  const [search, setSearch] = useState('');
+
   // Reversal Modal State
   const [reversalModalOpen, setReversalModalOpen] = useState(false);
   const [targetTx, setTargetTx] = useState(null);
   const [reversalReason, setReversalReason] = useState('Customer requested reversal / cancellation');
   const [reversing, setReversing] = useState(false);
 
+  // Sync URL query params to state on mount
+  useEffect(() => {
+    setStatus(searchParams.get('status') || '');
+    setStartDate(searchParams.get('startDate') || '');
+    setEndDate(searchParams.get('endDate') || '');
+    setMinAmount(searchParams.get('minAmount') || '');
+    setMaxAmount(searchParams.get('maxAmount') || '');
+    setType(searchParams.get('type') || '');
+    setSearch(searchParams.get('search') || '');
+    const pg = searchParams.get('page');
+    if (pg) setPage(parseInt(pg, 10));
+  }, [searchParams]);
+
+  // Helper to update URL without full reload
+  function updateURL(params) {
+    const newParams = new URLSearchParams(searchParams);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === '' || value === undefined || value === null) {
+        newParams.delete(key);
+      } else {
+        newParams.set(key, value);
+      }
+    });
+    // reset page to 1 when filters change (except page param)
+    if (params.page === undefined) newParams.set('page', '1');
+    setSearchParams(newParams, { replace: true });
+  }
+
   useEffect(() => {
     api.accounts()
       .then(({ accounts: list }) => {
         setAccounts(list);
         if (list.length > 0) {
-          setSelectedAccount(list[0]._id);
+          const initial = searchParams.get('accountId') || list[0]._id;
+          setSelectedAccount(initial);
         } else {
           setLoading(false);
         }
@@ -51,8 +92,14 @@ export function TransactionsPage() {
       const res = await api.transactions({
         accountId: selectedAccount,
         page,
-        limit: 10,
-        status: status || undefined
+        limit: 20,
+        status: status || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        minAmount: minAmount || undefined,
+        maxAmount: maxAmount || undefined,
+        type: type || undefined,
+        search: search || undefined
       });
       setData(res);
     } catch (requestError) {
@@ -64,16 +111,43 @@ export function TransactionsPage() {
 
   useEffect(() => {
     loadTransactions();
-  }, [selectedAccount, page, status]);
+  }, [selectedAccount, page, status, startDate, endDate, minAmount, maxAmount, type, search]);
 
   function changeAccount(value) {
     setSelectedAccount(value);
-    setPage(1);
+    updateURL({ accountId: value, page: 1 });
   }
 
   function changeStatus(value) {
     setStatus(value);
-    setPage(1);
+    updateURL({ status: value, page: 1 });
+  }
+
+  function changePage(newPage) {
+    setPage(newPage);
+    updateURL({ page: newPage });
+  }
+
+  function handleFilterChange(key, value) {
+    const params = { [key]: value };
+    if (key === 'startDate') setStartDate(value);
+    else if (key === 'endDate') setEndDate(value);
+    else if (key === 'minAmount') setMinAmount(value);
+    else if (key === 'maxAmount') setMaxAmount(value);
+    else if (key === 'type') setType(value);
+    else if (key === 'search') setSearch(value);
+    updateURL({ ...params, page: 1 });
+  }
+
+  function clearFilters() {
+    setStatus('');
+    setStartDate('');
+    setEndDate('');
+    setMinAmount('');
+    setMaxAmount('');
+    setType('');
+    setSearch('');
+    updateURL({ status: '', startDate: '', endDate: '', minAmount: '', maxAmount: '', type: '', search: '', page: 1 });
   }
 
   function copyText(text, id) {
@@ -126,7 +200,7 @@ export function TransactionsPage() {
       {/* Account & Filter Controls */}
       <Card className="hover:shadow-cardHover transition-shadow">
         <CardContent className="p-5">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
             {/* Account Selector */}
             <div className="space-y-1.5">
               <Label htmlFor="history-account">Target Account</Label>
@@ -149,7 +223,7 @@ export function TransactionsPage() {
               <Select
                 id="history-status"
                 value={status}
-                onChange={event => changeStatus(event.target.value)}
+                onChange={event => { setStatus(event.target.value); updateURL({ status: event.target.value, page: 1 }); }}
               >
                 <option value="">All Statuses</option>
                 <option value="completed">Completed (Committed)</option>
@@ -159,12 +233,102 @@ export function TransactionsPage() {
               </Select>
             </div>
 
-            {/* Quick Helper */}
-            <div className="hidden lg:flex flex-col justify-end">
-              <div className="rounded-md border border-accent-gold/30 bg-[#FEF9E7] p-3 text-xs text-amber-800 flex items-center gap-2">
-                <Info size={15} className="text-accent-gold flex-shrink-0" />
-                <span>Reversals write new inverse ledger entries without modifying past records.</span>
+            {/* Date Range */}
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+              <Label htmlFor="history-startDate">From Date</Label>
+              <Input
+                id="history-startDate"
+                type="date"
+                value={startDate}
+                onChange={e => { setStartDate(e.target.value); updateURL({ startDate: e.target.value, page: 1 }); }}
+                className="bg-white border-banking-border"
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+              <Label htmlFor="history-endDate">To Date</Label>
+              <Input
+                id="history-endDate"
+                type="date"
+                value={endDate}
+                onChange={e => { setEndDate(e.target.value); updateURL({ endDate: e.target.value, page: 1 }); }}
+                className="bg-white border-banking-border"
+              />
+            </div>
+
+            {/* Amount Range */}
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+              <Label htmlFor="history-minAmount">Min Amount</Label>
+              <Input
+                id="history-minAmount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={minAmount}
+                onChange={e => { setMinAmount(e.target.value); updateURL({ minAmount: e.target.value, page: 1 }); }}
+                className="bg-white border-banking-border"
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+              <Label htmlFor="history-maxAmount">Max Amount</Label>
+              <Input
+                id="history-maxAmount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="999999"
+                value={maxAmount}
+                onChange={e => { setMaxAmount(e.target.value); updateURL({ maxAmount: e.target.value, page: 1 }); }}
+                className="bg-white border-banking-border"
+              />
+            </div>
+
+            {/* Type Filter */}
+            <div className="space-y-1.5">
+              <Label htmlFor="history-type">Direction</Label>
+              <Select
+                id="history-type"
+                value={type}
+                onChange={e => { setType(e.target.value); updateURL({ type: e.target.value, page: 1 }); }}
+              >
+                <option value="">All</option>
+                <option value="incoming">Incoming (Credit)</option>
+                <option value="outgoing">Outgoing (Debit)</option>
+              </Select>
+            </div>
+
+            {/* Search */}
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-2 flex items-end">
+              <Label htmlFor="history-search" className="mb-1.5">Search Recipient</Label>
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-banking-textMuted" size={18} />
+                <Input
+                  id="history-search"
+                  type="text"
+                  placeholder="Account ID or name..."
+                  value={search}
+                  onChange={e => { setSearch(e.target.value); updateURL({ search: e.target.value, page: 1 }); }}
+                  className="pl-10 bg-white border-banking-border"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearch(''); updateURL({ search: '', page: 1 }); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-banking-textMuted hover:text-primary"
+                    aria-label="Clear search"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
               </div>
+            </div>
+
+            {/* Clear Filters */}
+            <div className="flex items-end">
+              <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
+                <Filter className="mr-1.5" size={14} />
+                Clear Filters
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -343,7 +507,7 @@ export function TransactionsPage() {
                     variant="outline"
                     size="sm"
                     disabled={!pagination.hasPrevPage}
-                    onClick={() => setPage(current => current - 1)}
+                    onClick={() => changePage(pagination.page - 1)}
                     className="h-8 text-xs"
                   >
                     <ChevronLeft size={14} />
@@ -353,7 +517,7 @@ export function TransactionsPage() {
                     variant="outline"
                     size="sm"
                     disabled={!pagination.hasNextPage}
-                    onClick={() => setPage(current => current + 1)}
+                    onClick={() => changePage(pagination.page + 1)}
                     className="h-8 text-xs"
                   >
                     Next

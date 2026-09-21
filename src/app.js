@@ -9,6 +9,7 @@ const authRouter = require("./routes/auth.route");
 const accountRouter = require("./routes/account.route");
 const transactionRouter = require("./routes/transaction.route");
 const demoRouter = require('./routes/demo.route');
+const adminRouter = require('./routes/admin.route');
 const { notFoundHandler, errorHandler } = require('./middleware/error.middleware');
 
 const app = express();
@@ -91,6 +92,7 @@ app.use("/api/auth", authLimiter, authRouter); // Stricter rate limit on auth ro
 app.use("/api/accounts", accountRouter);
 app.use("/api/transactions", transactionRouter);
 app.use('/api/demo', demoRouter);
+app.use('/api/admin', adminRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

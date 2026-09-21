@@ -1,9 +1,11 @@
-const transactionModel = require("../models/transaction.model");
-const ledgerModel = require("../models/ledger.model");
-const accountModel = require("../models/account.model");
-const mongoose = require("mongoose");
-const emailService = require("../service/GmailService");
-const redisService = require("../service/redis.service");
+﻿const mongoose = require('mongoose');
+const accountModel = require('../models/account.model');
+const ledgerModel = require('../models/ledger.model');
+const transactionModel = require('../models/transaction.model');
+const redisService = require('../service/redis.service');
+const emailService = require('../service/GmailService');
+const crypto = require('crypto');
+const { AppError } = require('../middleware/error.middleware');
 
 function notify(send) {
     Promise.resolve().then(send).catch(() => undefined);
@@ -19,516 +21,171 @@ async function createTransaction(req, res, next) {
     let idempotencyClaimed = false;
 
     try {
-        // ==========================================
-        // 1. PRE-DB INPUT VALIDATION
-        // ==========================================
+        // 1. PRE‑DB INPUT VALIDATION
         if (!fromAccountId || !toAccountId || !amount || !idempotencyKey) {
-            return res.status(400).json({
-                message: "Missing required fields: fromAccountId, toAccountId, amount, and idempotencyKey are required"
-            });
+            return res.status(400).json({ message: "Missing required fields: fromAccountId, toAccountId, amount, and idempotencyKey are required" });
         }
-
-        // Validate amount is a positive number
         const numericAmount = Number(amount);
         if (isNaN(numericAmount) || numericAmount <= 0) {
             return res.status(400).json({ message: "Amount must be a positive number greater than zero" });
         }
-
-        // Prevent transferring to the exact same account
         if (fromAccountId.toString() === toAccountId.toString()) {
             return res.status(400).json({ message: "Cannot transfer funds to the same account" });
         }
-
-        // Validate MongoDB ObjectIds format
         if (!mongoose.Types.ObjectId.isValid(fromAccountId) || !mongoose.Types.ObjectId.isValid(toAccountId)) {
             return res.status(400).json({ message: "Invalid account ID format" });
         }
 
-        // ==========================================
         // 2. FAST REDIS IDEMPOTENCY CHECK
-        // ==========================================
         const redisIdempotency = await redisService.checkIdempotency(idempotencyKey);
         if (redisIdempotency.status === 'COMPLETED') {
-            return res.status(200).json({
-                message: "Transaction already processed (cached)",
-                transaction: redisIdempotency.data?.transaction || redisIdempotency.data
-            });
+            return res.status(200).json({ message: "Transaction already processed (cached)", transaction: redisIdempotency.data?.transaction || redisIdempotency.data });
         }
-
         if (redisIdempotency.status === 'IN_PROGRESS') {
-            return res.status(409).json({
-                message: "A transaction with this idempotency key is currently being processed"
-            });
+            return res.status(409).json({ message: "A transaction with this idempotency key is currently being processed" });
         }
-
-        // Fallback DB Idempotency check
         const existingTransaction = await transactionModel.findOne({ idempotencyKey });
         if (existingTransaction) {
             await redisService.setIdempotencyCompleted(idempotencyKey, { transaction: existingTransaction });
-            return res.status(409).json({
-                message: "Transaction already processed with this idempotency key",
-                transaction: existingTransaction
-            });
+            return res.status(409).json({ message: "Transaction already processed with this idempotency key", transaction: existingTransaction });
         }
-
-        // Claim idempotency key in Redis (locks out duplicate concurrent submissions)
         idempotencyClaimed = await redisService.setIdempotencyProcessing(idempotencyKey, 60);
         if (!idempotencyClaimed) {
-            return res.status(409).json({
-                message: "A transaction with this idempotency key is currently being processed"
-            });
+            return res.status(409).json({ message: "A transaction with this idempotency key is currently being processed" });
         }
 
-        // ==========================================
         // 3. REDIS DISTRIBUTED LOCK ACQUISITION
-        // ==========================================
-        // Lock both participating accounts in sorted order to prevent deadlocks
-        const accountLockKeys = [
-            `lock:account:${fromAccountId}`,
-            `lock:account:${toAccountId}`
-        ];
-
+        const accountLockKeys = [`lock:account:${fromAccountId}`, `lock:account:${toAccountId}`];
         multiLock = await redisService.acquireMultiLock(accountLockKeys, 8000);
         if (!multiLock.acquired) {
             await redisService.clearIdempotency(idempotencyKey);
-            return res.status(429).json({
-                message: "Accounts are currently processing another transaction. Please try again shortly."
-            });
+            return res.status(429).json({ message: "Accounts are currently processing another transaction. Please try again shortly." });
         }
 
-        // ==========================================
         // 4. ACCOUNT VERIFICATION & AUTHORIZATION
-        // ==========================================
-        // Sender account must exist and belong to the authenticated user
-        const fromAccount = await accountModel.findOne({
-            _id: fromAccountId,
-            user: req.user._id
-        }).populate('user', 'name email');
-
-        if (!fromAccount) {
-            await multiLock.releaseAll();
-            await redisService.clearIdempotency(idempotencyKey);
-            return res.status(404).json({ message: "Source account not found or does not belong to you" });
-        }
-
-        if (fromAccount.status !== 'active') {
-            await multiLock.releaseAll();
-            await redisService.clearIdempotency(idempotencyKey);
-            return res.status(400).json({ message: `Source account is ${fromAccount.status} and cannot initiate transfers` });
-        }
-
-        // Destination account must exist
+        const fromAccount = await accountModel.findOne({ _id: fromAccountId, user: req.user._id }).populate('user', 'name email');
+        if (!fromAccount) { await multiLock.releaseAll(); await redisService.clearIdempotency(idempotencyKey); return res.status(404).json({ message: "Source account not found or does not belong to you" }); }
+        if (fromAccount.status !== 'active') { await multiLock.releaseAll(); await redisService.clearIdempotency(idempotencyKey); return res.status(400).json({ message: `Source account is ${fromAccount.status} and cannot initiate transfers` }); }
         const toAccount = await accountModel.findById(toAccountId).populate('user', 'name email');
-        if (!toAccount) {
-            await multiLock.releaseAll();
-            await redisService.clearIdempotency(idempotencyKey);
-            return res.status(404).json({ message: "Destination account not found" });
-        }
+        if (!toAccount) { await multiLock.releaseAll(); await redisService.clearIdempotency(idempotencyKey); return res.status(404).json({ message: "Destination account not found" }); }
+        if (toAccount.status !== 'active') { await multiLock.releaseAll(); await redisService.clearIdempotency(idempotencyKey); return res.status(400).json({ message: `Destination account is ${toAccount.status} and cannot receive transfers` }); }
+        if (fromAccount.currency !== toAccount.currency) { await multiLock.releaseAll(); await redisService.clearIdempotency(idempotencyKey); return res.status(400).json({ message: `Currency mismatch: source ${fromAccount.currency} vs destination ${toAccount.currency}` }); }
 
-        if (toAccount.status !== 'active') {
-            await multiLock.releaseAll();
-            await redisService.clearIdempotency(idempotencyKey);
-            return res.status(400).json({ message: `Destination account is ${toAccount.status} and cannot receive transfers` });
-        }
-
-        // Ensure both accounts use the same currency
-        if (fromAccount.currency !== toAccount.currency) {
-            await multiLock.releaseAll();
-            await redisService.clearIdempotency(idempotencyKey);
-            return res.status(400).json({
-                message: `Currency mismatch: source account is in ${fromAccount.currency} but destination is in ${toAccount.currency}`
-            });
-        }
-
-        // ==========================================
-        // 5. PRE-TRANSACTION BALANCE CHECK (LEDGER AGGREGATION)
-        // ==========================================
+        // 5. PRE‑TRANSACTION BALANCE CHECK
         const balanceAgg = await ledgerModel.aggregate([
             { $match: { account: fromAccount._id } },
-            {
-                $group: {
-                    _id: null,
-                    balance: {
-                        $sum: {
-                            $cond: [
-                                { $eq: ["$type", "credit"] },
-                                "$amount",
-                                { $multiply: ["$amount", -1] }
-                            ]
-                        }
-                    }
-                }
-            }
+            { $group: { _id: null, balance: { $sum: { $cond: [{ $eq: ["$type", "credit"] }, "$amount", { $multiply: ["$amount", -1] }] } } } }
         ]);
-
-        const currentBalance = balanceAgg.length > 0 ? balanceAgg[0].balance : 0;
-
+        const currentBalance = balanceAgg.length ? balanceAgg[0].balance : 0;
         if (currentBalance < numericAmount) {
-            await multiLock.releaseAll();
-            await redisService.clearIdempotency(idempotencyKey);
-
-            // Send failure notification email
-            if (fromAccount.user?.email) {
-                notify(() => emailService.failureNotificationEmail(
-                    fromAccount.user.email,
-                    fromAccount.user.name,
-                    `Insufficient funds. You attempted to send ${numericAmount} ${fromAccount.currency} but your current balance is ${currentBalance} ${fromAccount.currency}.`
-                ));
-            }
-
-            return res.status(400).json({
-                message: "Insufficient funds",
-                currentBalance,
-                requestedAmount: numericAmount,
-                currency: fromAccount.currency
-            });
+            await multiLock.releaseAll(); await redisService.clearIdempotency(idempotencyKey);
+            if (fromAccount.user?.email) { notify(() => emailService.failureNotificationEmail(fromAccount.user.email, fromAccount.user.name, `Insufficient funds. You attempted to send ${numericAmount} ${fromAccount.currency} but your balance is ${currentBalance} ${fromAccount.currency}.`)); }
+            return res.status(400).json({ message: "Insufficient funds", currentBalance, requestedAmount: numericAmount, currency: fromAccount.currency });
         }
 
-        // ==========================================
         // 6. ACID TRANSACTION EXECUTION (MONGODB SESSION)
-        // ==========================================
         const session = await mongoose.startSession();
         session.startTransaction();
-
         try {
-            // Step A: Acquire database-level write conflict barrier (Optimistic Concurrency Control)
-            // Mutating the source account document inside the session forces MongoDB's WiredTiger engine
-            // to acquire a document write lock. If another concurrent transfer targets this account when Redis
-            // is offline, MongoDB automatically triggers a WriteConflictError, preventing race condition overdraws.
-            const lockedSource = await accountModel.findOneAndUpdate(
-                { _id: fromAccount._id, status: 'active' },
-                { $inc: { version: 1 } },
-                { session, returnDocument: 'after' }
-            );
+            const lockedSource = await accountModel.findOneAndUpdate({ _id: fromAccount._id, status: 'active' }, { $inc: { version: 1 } }, { session, returnDocument: 'after' });
+            if (!lockedSource) throw new Error("Source account is no longer active or available");
+            const txBalanceAgg = await ledgerModel.aggregate([{ $match: { account: fromAccount._id } }, { $group: { _id: null, balance: { $sum: { $cond: [{ $eq: ["$type", "credit"] }, "$amount", { $multiply: ["$amount", -1] }] } } } ]).session(session);
+            const txBalance = txBalanceAgg.length ? txBalanceAgg[0].balance : 0;
+            if (txBalance < numericAmount) throw new Error(`Insufficient funds: available ${txBalance} ${fromAccount.currency}`);
 
-            if (!lockedSource) {
-                throw new Error("Source account is no longer active or available");
-            }
-
-            // Step B: Re-verify balance inside the transaction snapshot to guarantee consistency
-            const txBalanceAgg = await ledgerModel.aggregate([
-                { $match: { account: fromAccount._id } },
-                {
-                    $group: {
-                        _id: null,
-                        balance: {
-                            $sum: {
-                                $cond: [
-                                    { $eq: ["$type", "credit"] },
-                                    "$amount",
-                                    { $multiply: ["$amount", -1] }
-                                ]
-                            }
-                        }
-                    }
-                }
-            ]).session(session);
-
-            const txBalance = txBalanceAgg.length > 0 ? txBalanceAgg[0].balance : 0;
-            if (txBalance < numericAmount) {
-                throw new Error(`Insufficient funds: available balance is ${txBalance} ${fromAccount.currency}`);
-            }
-
-            // Step C: Create transaction journal entry with status "pending"
-            const transactionDocs = await transactionModel.create([{
-                fromAccount: fromAccount._id,
-                toAccount: toAccount._id,
-                status: "pending",
-                amount: numericAmount,
-                idempotencyKey,
-            }], { session });
-
+            const transactionDocs = await transactionModel.create([{ fromAccount: fromAccount._id, toAccount: toAccount._id, status: "pending", amount: numericAmount, idempotencyKey }], { session });
             const transaction = transactionDocs[0];
-
-            // Step D: Write DEBIT ledger entry for sender account
-            await ledgerModel.create([{
-                account: fromAccount._id,
-                amount: numericAmount,
-                transaction: transaction._id,
-                type: 'debit',
-            }], { session });
-
-            // Step E: Write CREDIT ledger entry for recipient account
-            await ledgerModel.create([{
-                account: toAccount._id,
-                amount: numericAmount,
-                transaction: transaction._id,
-                type: 'credit',
-            }], { session });
-
-            // Step F: Update transaction status to "completed"
+            await ledgerModel.create([{ account: fromAccount._id, amount: numericAmount, transaction: transaction._id, type: 'debit' }], { session });
+            await ledgerModel.create([{ account: toAccount._id, amount: numericAmount, transaction: transaction._id, type: 'credit' }], { session });
             transaction.status = 'completed';
             await transaction.save({ session });
-
-            // Step G: Commit the entire atomic transaction
-            await session.commitTransaction();
-            session.endSession();
-
-            // Step F: Cache completed transaction in Redis for instant replay
+            await session.commitTransaction(); session.endSession();
             await redisService.setIdempotencyCompleted(idempotencyKey, { transaction });
-
-            // Step G: Release distributed locks
-            if (multiLock) {
-                await multiLock.releaseAll();
-                multiLock = null;
-            }
-
-            // Step H: Send email notification asynchronously (non-blocking)
-            if (fromAccount.user?.email) {
-                notify(() => emailService.sendTransactionEmail(
-                    fromAccount.user.email,
-                    fromAccount.user.name,
-                    `Sent ${numericAmount} ${fromAccount.currency} to account ${toAccount._id}. Transaction ID: ${transaction._id}`
-                ));
-            }
-
-            return res.status(201).json({
-                message: "Transaction completed successfully",
-                transaction
-            });
-
-        } catch (error) {
-            // Roll back all writes made in this session if anything fails
-            await session.abortTransaction();
-            session.endSession();
-
-            // Clear idempotency lock in Redis so client can retry
+            if (multiLock) { await multiLock.releaseAll(); multiLock = null; }
+            if (fromAccount.user?.email) { notify(() => emailService.sendTransactionEmail(fromAccount.user.email, fromAccount.user.name, `Sent ${numericAmount} ${fromAccount.currency} to account ${toAccount._id}. Tx ID: ${transaction._id}`)); }
+            return res.status(201).json({ message: "Transaction completed successfully", transaction });
+        } catch (e) {
+            await session.abortTransaction(); session.endSession();
             await redisService.clearIdempotency(idempotencyKey);
-
-            // Release distributed locks
-            if (multiLock) {
-                await multiLock.releaseAll();
-                multiLock = null;
-            }
-
-            // Send failure notification email
-            if (fromAccount.user?.email) {
-                notify(() => emailService.failureNotificationEmail(
-                    fromAccount.user.email,
-                    fromAccount.user.name,
-                    `Transaction failed: ${error.message}. Amount: ${numericAmount} ${fromAccount.currency}. Please contact support if this issue persists.`
-                ));
-            }
-
-            throw error;
+            if (multiLock) { await multiLock.releaseAll(); multiLock = null; }
+            if (fromAccount.user?.email) { notify(() => emailService.failureNotificationEmail(fromAccount.user.email, fromAccount.user.name, `Transaction failed: ${e.message}. Amount: ${numericAmount} ${fromAccount.currency}.`)); }
+            throw e;
         }
-
-    } catch (error) {
-        if (multiLock) {
-            await multiLock.releaseAll().catch(() => {});
-        }
-        await redisService.clearIdempotency(idempotencyKey).catch(() => {});
-        next(error);
+    } catch (e) {
+        if (multiLock) await multiLock.releaseAll().catch(()=>{});
+        await redisService.clearIdempotency(idempotencyKey).catch(()=>{});
+        next(e);
     }
 }
 
-/**
- * System User Initial Funds Injection
- * Injects initial funds from a system user into any user account
- */
+/** System User Initial Funds Injection */
 async function createInitialfundsTransaction(req, res, next) {
     const { toAccountId, amount, idempotencyKey } = req.body;
-
     try {
-        // Pre-DB Input Validation
-        if (!toAccountId || !amount || !idempotencyKey) {
-            return res.status(400).json({ message: "Missing required fields: toAccountId, amount, and idempotencyKey are required" });
-        }
-
+        if (!toAccountId || !amount || !idempotencyKey) return res.status(400).json({ message: "Missing toAccountId, amount, idempotencyKey" });
         const numericAmount = Number(amount);
-        if (isNaN(numericAmount) || numericAmount <= 0) {
-            return res.status(400).json({ message: "Amount must be a positive number greater than zero" });
-        }
-
-        if (!mongoose.Types.ObjectId.isValid(toAccountId)) {
-            return res.status(400).json({ message: "Invalid destination account ID format" });
-        }
-
-        // Idempotency check
-        const existingTransaction = await transactionModel.findOne({ idempotencyKey });
-        if (existingTransaction) {
-            return res.status(409).json({
-                message: "Transaction already processed with this idempotency key",
-                transaction: existingTransaction
-            });
-        }
-
-        // Find recipient account
+        if (isNaN(numericAmount) || numericAmount <= 0) return res.status(400).json({ message: "Amount must be > 0" });
+        if (!mongoose.Types.ObjectId.isValid(toAccountId)) return res.status(400).json({ message: "Invalid toAccountId" });
+        const existing = await transactionModel.findOne({ idempotencyKey });
+        if (existing) return res.status(409).json({ message: "Already processed", transaction: existing });
         const toAccount = await accountModel.findById(toAccountId);
-        if (!toAccount) {
-            return res.status(404).json({ message: "Destination account not found" });
-        }
-
-        // Find system user's account matching destination currency, or auto-create one
+        if (!toAccount) return res.status(404).json({ message: "Destination account not found" });
         let fromUserAccount = await accountModel.findOne({ user: req.user._id, currency: toAccount.currency });
-        if (!fromUserAccount) {
-            fromUserAccount = await accountModel.create({ user: req.user._id, currency: toAccount.currency });
-        }
-
-        // Start ACID Transaction
-        const session = await mongoose.startSession();
-        session.startTransaction();
-
+        if (!fromUserAccount) fromUserAccount = await accountModel.create({ user: req.user._id, currency: toAccount.currency });
+        const session = await mongoose.startSession(); session.startTransaction();
         try {
-            const transactionDocs = await transactionModel.create([{
-                fromAccount: fromUserAccount._id,
-                toAccount: toAccount._id,
-                status: "pending",
-                amount: numericAmount,
-                idempotencyKey,
-            }], { session });
-
-            const transaction = transactionDocs[0];
-
-            await ledgerModel.create([{
-                account: fromUserAccount._id,
-                amount: numericAmount,
-                transaction: transaction._id,
-                type: 'debit',
-            }], { session });
-
-            await ledgerModel.create([{
-                account: toAccount._id,
-                amount: numericAmount,
-                transaction: transaction._id,
-                type: 'credit',
-            }], { session });
-
-            transaction.status = 'completed';
-            await transaction.save({ session });
-
-            await session.commitTransaction();
-            session.endSession();
-
-            return res.status(201).json({
-                message: "Initial funds injected successfully",
-                transaction
-            });
-        } catch (error) {
-            await session.abortTransaction();
-            session.endSession();
-            throw error;
-        }
-    } catch (error) {
-        next(error);
-    }
+            const txDocs = await transactionModel.create([{ fromAccount: fromUserAccount._id, toAccount: toAccount._id, status: "pending", amount: numericAmount, idempotencyKey }], { session });
+            const tx = txDocs[0];
+            await ledgerModel.create([{ account: fromUserAccount._id, amount: numericAmount, transaction: tx._id, type: 'debit' }], { session });
+            await ledgerModel.create([{ account: toAccount._id, amount: numericAmount, transaction: tx._id, type: 'credit' }], { session });
+            tx.status = 'completed'; await tx.save({ session });
+            await session.commitTransaction(); session.endSession();
+            return res.status(201).json({ message: "Initial funds injected", transaction: tx });
+        } catch (e) { await session.abortTransaction(); session.endSession(); throw e; }
+    } catch (e) { next(e); }
 }
 
-/**
- * Get Transaction History with Pagination and Filtering
- * Returns paginated list of transactions for the authenticated user's accounts
- */
+/** Get Transaction History with Pagination & Filtering */
 async function getTransactionHistory(req, res, next) {
     try {
-        const { page = 1, limit = 10, status, startDate, endDate, accountId } = req.query;
-        const pageNum = Math.max(1, parseInt(page, 10) || 1);
-        const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
-
-        // Get all accounts owned by the authenticated user
-        const userAccounts = await accountModel.find({ user: req.user._id }).select('_id');
-        const userAccountIds = userAccounts.map(acc => acc._id);
-
-        if (userAccountIds.length === 0) {
-            return res.status(200).json({
-                transactions: [],
-                pagination: {
-                    page: pageNum,
-                    limit: limitNum,
-                    total: 0,
-                    totalPages: 0,
-                    hasNextPage: false,
-                    hasPrevPage: false
-                }
-            });
-        }
-
-        // Build query filter
-        const filter = {
-            $or: [
-                { fromAccount: { $in: userAccountIds } },
-                { toAccount: { $in: userAccountIds } }
-            ]
-        };
-
-        // Filter by specific account if provided
+        const { page = 1, limit = 20, status, startDate, endDate, accountId, minAmount, maxAmount, type, search } = req.query;
+        const pageNum = Math.max(1, parseInt(page,10)||1);
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit,10)||20));
+        const userAccounts = await require('../models/account.model').find({ user: req.user._id }).select('_id');
+        const userAccountIds = userAccounts.map(a=>a._id);
+        if (!userAccountIds.length) return res.json({ transactions:[], pagination:{page:pageNum,limit:limitNum,total:0,totalPages:0,hasNextPage:false,hasPrevPage:false} });
+        const filter = { $or:[{fromAccount:{$in:userAccountIds}},{toAccount:{$in:userAccountIds}}] };
         if (accountId && mongoose.Types.ObjectId.isValid(accountId)) {
-            // Check if this account belongs to the user
-            if (!userAccountIds.some(id => id.toString() === accountId.toString())) {
-                return res.status(403).json({ message: 'Access denied to this account' });
-            }
-            filter.$or = [
-                { fromAccount: new mongoose.Types.ObjectId(accountId) },
-                { toAccount: new mongoose.Types.ObjectId(accountId) }
-            ];
+            if (!userAccountIds.some(id=>id.toString()===accountId.toString())) return res.status(403).json({message:'Access denied'});
+            filter.$or = [{fromAccount:new mongoose.Types.ObjectId(accountId)},{toAccount:new mongoose.Types.ObjectId(accountId)}];
         }
-
-        // Filter by status if provided
-        if (status) {
-            filter.status = status;
+        if (status) filter.status = status;
+        if (minAmount!==undefined||maxAmount!==undefined){ filter.amount={}; if(minAmount!==undefined) filter.amount.$gte=Number(minAmount); if(maxAmount!==undefined) filter.amount.$lte=Number(maxAmount); }
+        if (type && req.user.role!=='admin'){
+            if(type==='incoming'){ filter.toAccount={$in:userAccountIds}; delete filter.$or; }
+            else if(type==='outgoing'){ filter.fromAccount={$in:userAccountIds}; delete filter.$or; }
         }
-
-        // Filter by date range if provided
-        if (startDate || endDate) {
-            filter.createdAt = {};
-            if (startDate) {
-                filter.createdAt.$gte = new Date(startDate);
-            }
-            if (endDate) {
-                // Add one day to include the entire end date if it's YYYY-MM-DD
-                const endDateTime = new Date(endDate);
-                if (endDate.length <= 10) {
-                    endDateTime.setDate(endDateTime.getDate() + 1);
-                    filter.createdAt.$lt = endDateTime;
-                } else {
-                    filter.createdAt.$lte = endDateTime;
-                }
-            }
+        if (search?.trim()){
+            const term=search.trim(); const isAdmin=req.user.role==='admin';
+            const accountQuery = isAdmin ? {} : { user:{$in:userAccountIds} };
+            const counterpartAccounts = await require('../models/account.model').find({$and:[accountQuery,{_id:{$regex:term,$options:'i'}}]}).select('_id').lean();
+            const counterpartIds = counterpartAccounts.map(a=>a._id);
+            if(counterpartIds.length){ filter.$or=[{fromAccount:{$in:counterpartIds}},{toAccount:{$in:counterpartIds}}]; } else { filter._id={$exists:false}; }
         }
-
-        // Calculate pagination
-        const skip = (pageNum - 1) * limitNum;
-
-        // Execute query with pagination
-        const [transactions, totalCount] = await Promise.all([
-            transactionModel
-                .find(filter)
-                .populate('fromAccount', 'currency status')
-                .populate('toAccount', 'currency status')
-                .sort({ createdAt: -1 }) // Most recent first
-                .skip(skip)
-                .limit(limitNum)
-                .lean(),
-            transactionModel.countDocuments(filter)
+        if (startDate||endDate){ filter.createdAt={}; if(startDate) filter.createdAt.$gte=new Date(startDate); if(endDate){ const ed=new Date(endDate); if(endDate.length<=10){ ed.setDate(ed.getDate()+1); filter.createdAt.$lt=ed; } else filter.createdAt.$lte=ed; } }
+        const skip = (pageNum-1)*limitNum;
+        const [transactions,total] = await Promise.all([
+            require('../models/transaction.model').find(filter).populate('fromAccount','currency status user').populate('toAccount','currency status user').sort({createdAt:-1}).skip(skip).limit(limitNum).lean(),
+            require('../models/transaction.model').countDocuments(filter)
         ]);
-
-        const totalPages = Math.ceil(totalCount / limitNum);
-
-        return res.status(200).json({
-            transactions,
-            pagination: {
-                page: pageNum,
-                limit: limitNum,
-                total: totalCount,
-                totalPages,
-                hasNextPage: pageNum < totalPages,
-                hasPrevPage: pageNum > 1
-            }
-        });
-
-    } catch (error) {
-        next(error);
-    }
-
-
-async function reverseTransaction(req, res, next) {
-    return res.status(403).json({ message: 'Reversal not allowed for regular users' });
+        const totalPages = Math.ceil(total/limitNum);
+        return res.json({transactions,pagination:{page:pageNum,limit:limitNum,total,totalPages,hasNextPage:pageNum<totalPages,hasPrevPage:pageNum>1}});
+    } catch(e){ next(e); }
 }
 
-module.exports = {
-    createTransaction,
-    createInitialfundsTransaction,
-    getTransactionHistory,
-    reverseTransaction
-};
- 
- 
+/* ADMIN‑ONLY STUB (regular users get 403) */
+async function reverseTransaction(req,res,next){
+    return res.status(403).json({message:'Reversal not allowed for regular users'});
+}
+
+module.exports = { createTransaction, createInitialfundsTransaction, getTransactionHistory, reverseTransaction };

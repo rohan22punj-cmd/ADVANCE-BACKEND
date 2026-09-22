@@ -2,7 +2,7 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
@@ -12,7 +12,7 @@ const buttonVariants = cva(
         ghost: 'text-banking-text hover:bg-banking-bg',
         destructive: 'bg-debit text-white hover:bg-[#A82020] shadow-sm',
       },
-      size: { default: '', sm: 'h-8 px-3 text-xs', lg: 'h-11 px-6 text-base', icon: 'h-10 w-10 px-0' }
+      size: { default: '', sm: 'h-10 px-3 text-xs', lg: 'h-12 px-6 text-base', icon: 'h-11 w-11 px-0' }
     },
     defaultVariants: { variant: 'primary', size: 'default' }
   }

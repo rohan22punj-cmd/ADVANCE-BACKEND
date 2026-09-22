@@ -193,7 +193,7 @@ export function LoginPage({ onAuthenticated, mode: initialMode = 'login' }) {
         </Card>
 
         {/* Feature Highlights */}
-        <div className="mt-6 grid grid-cols-3 gap-3 text-center">
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
           <div className="flex flex-col items-center p-3 rounded-lg border border-banking-border bg-white">
             <ShieldCheck size={18} className="text-primary mb-1.5" />
             <span className="text-xs font-medium text-banking-text">ACID Sessions</span>

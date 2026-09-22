@@ -10,6 +10,76 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input, Label, Select } from '../components/ui/input';
 
+function TransactionCard({ transaction, selectedAccount, currentAccountObj, copyText, copiedId }) {
+  const fromAccId = String(transaction.fromAccount?._id || transaction.fromAccount);
+  const toAccId = String(transaction.toAccount?._id || transaction.toAccount);
+  const isOutgoing = fromAccId === selectedAccount;
+  const isReversal = transaction.type === 'reversal';
+  const counterpartyId = isOutgoing ? toAccId : fromAccId;
+  const currency = currentAccountObj?.currency || 'INR';
+
+  return (
+    <Card className="border-banking-border hover:bg-banking-bg transition-colors">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${
+                isOutgoing
+                  ? 'bg-debit-light text-debit border border-debit/30'
+                  : 'bg-success-light text-success border border-success/30'
+              }`}>
+                {isOutgoing ? <ArrowUpRight size={13} /> : <ArrowDownLeft size={13} />}
+              </span>
+              <p className="text-xs font-medium text-banking-text">
+                {isOutgoing ? 'Debit (Outgoing)' : 'Credit (Incoming)'}
+              </p>
+            </div>
+            <p className="mt-1 font-mono text-[11px] text-banking-textLight">{shortId(counterpartyId)}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={`font-semibold text-sm tabular-nums ${isOutgoing ? 'text-banking-text' : 'text-success'}`}>
+              {isOutgoing ? '−' : '+'}{formatMoney(transaction.amount, currency)}
+            </span>
+            <Badge status={transaction.status} />
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-2 border-t border-banking-border text-[11px] text-banking-textLight">
+          <div className="flex items-center gap-2">
+            <Calendar size={12} />
+            <span className="font-mono">
+              {new Date(transaction.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+            <span className="hidden sm:inline">•</span>
+            <span className="font-mono">{new Date(transaction.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono truncate max-w-[140px]" title={transaction.idempotencyKey}>Key: {shortId(transaction.idempotencyKey)}</span>
+            <button
+              type="button"
+              onClick={() => copyText(transaction._id, transaction._id)}
+              className="text-banking-textLight hover:text-primary"
+              title="Copy Transaction ID"
+            >
+              {copiedId === transaction._id ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-1 text-[11px] text-banking-textLight">
+          <span className="font-mono text-banking-textMuted">{shortId(transaction._id)}</span>
+          {transaction.status === 'reversed' ? (
+            <span className="italic">Reversed</span>
+          ) : (
+            <span>—</span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function TransactionsPage() {
   const { refreshAccounts } = useLedger();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -330,7 +400,22 @@ export function TransactionsPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Mobile Card Layout */}
+              <div className="block md:hidden p-4 space-y-3">
+                {data.transactions.map(transaction => (
+                  <TransactionCard
+                    key={transaction._id}
+                    transaction={transaction}
+                    selectedAccount={selectedAccount}
+                    currentAccountObj={currentAccountObj}
+                    copyText={copyText}
+                    copiedId={copiedId}
+                  />
+                ))}
+              </div>
+
+              {/* Desktop Table Layout */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full min-w-[700px] text-left text-sm">
                   <thead className="bg-banking-bg border-b border-banking-border text-xs uppercase tracking-wider text-banking-textMuted">
                     <tr>
@@ -459,7 +544,7 @@ export function TransactionsPage() {
                     size="sm"
                     disabled={!pagination.hasPrevPage}
                     onClick={() => changePage(pagination.page - 1)}
-                    className="h-8 text-xs"
+                    className="h-10 text-xs"
                   >
                     <ChevronLeft size={14} />
                     Previous
@@ -469,7 +554,7 @@ export function TransactionsPage() {
                     size="sm"
                     disabled={!pagination.hasNextPage}
                     onClick={() => changePage(pagination.page + 1)}
-                    className="h-8 text-xs"
+                    className="h-10 text-xs"
                   >
                     Next
                     <ChevronRight size={14} />

@@ -423,7 +423,7 @@ export function TransferPage() {
                           type="button"
                           variant="outline"
                           onClick={handleCancelConfirm}
-                          size="sm"
+                          size="default"
                         >
                           <XCircle size={13} className="mr-1" />
                           Change
@@ -431,7 +431,7 @@ export function TransferPage() {
                         <Button
                           type="submit"
                           variant="secondary"
-                          size="sm"
+                          size="default"
                           disabled={confirming || busy || isOverdrawn}
                         >
                           {confirming ? (
@@ -460,7 +460,7 @@ export function TransferPage() {
                         <Button
                           type="button"
                           variant="ghost"
-                          size="sm"
+                          size="default"
                           onClick={() => handleQuickAmount(50)}
                         >
                           +50
@@ -468,7 +468,7 @@ export function TransferPage() {
                         <Button
                           type="button"
                           variant="ghost"
-                          size="sm"
+                          size="default"
                           onClick={() => handleQuickAmount(100)}
                         >
                           +100
@@ -476,7 +476,7 @@ export function TransferPage() {
                         <Button
                           type="button"
                           variant="secondary"
-                          size="sm"
+                          size="default"
                           onClick={handleMaxAmount}
                         >
                           MAX
@@ -527,6 +527,7 @@ export function TransferPage() {
                   <Button
                     type="submit"
                     className="w-full"
+                    size="lg"
                     disabled={busy || !form.toAccountId || !form.amount || isOverdrawn}
                   >
                     {busy ? (

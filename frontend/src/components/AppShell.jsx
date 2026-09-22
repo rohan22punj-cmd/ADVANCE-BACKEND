@@ -166,7 +166,7 @@ export function AppShell({ children, onLogout }) {
         {/* Mobile Nav Drawer */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-white/10 px-4 py-3 bg-primary/95 animate-in slide-in-from-top-2 duration-200">
-            <nav className="flex gap-2 overflow-x-auto pb-2">
+            <nav className="flex flex-col gap-1">
               {navigation.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -174,7 +174,7 @@ export function AppShell({ children, onLogout }) {
                   onClick={() => setMobileMenuOpen(false)}
                   className={({ isActive }) =>
                     cn(
-                      'flex flex-col items-center gap-1 py-2 px-4 text-xs font-medium rounded-md whitespace-nowrap transition-all',
+                      'flex items-center gap-2 py-2.5 px-3 text-sm font-medium rounded-md transition-all',
                       isActive ? 'bg-white/15 text-white' : 'text-white/80'
                     )
                   }

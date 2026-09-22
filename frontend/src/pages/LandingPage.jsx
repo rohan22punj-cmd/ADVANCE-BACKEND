@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
 export function LandingPage() {
   const navRef = useRef(null);
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -92,11 +94,21 @@ export function LandingPage() {
             </span>
           </Link>
 
+          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-1 bg-white/70 px-3 py-1.5 rounded-full border border-gray-200/80 shadow-xs">
             {['Features', 'Solutions', 'Security', 'Protocol', 'Governance'].map(label => (
               <button key={label} onClick={() => scrollTo(label.toLowerCase())} className="text-sm font-medium text-slate-muted hover:text-slate-charcoal px-3 py-1.5 rounded-full hover:bg-gray-100/70 transition-all duration-200">{label}</button>
             ))}
           </nav>
+
+          {/* Mobile Menu Button */}
+          <button
+            className="md:hidden p-2 rounded-md text-slate-charcoal hover:bg-gray-100 transition-colors"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
 
           <div className="flex items-center gap-3">
             <Link to="/login" className="text-sm font-medium text-slate-muted hover:text-slate-charcoal px-4 py-2 rounded-lg border border-transparent hover:border-gray-200 hover:bg-white transition-all duration-200">Login</Link>
@@ -107,6 +119,29 @@ export function LandingPage() {
             </Button>
           </div>
         </div>
+
+        {/* Mobile Nav Drawer */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-gray-200/80 px-6 py-4 bg-white animate-in slide-in-from-top-2 duration-200">
+            <nav className="flex flex-col gap-2">
+              {['Features', 'Solutions', 'Security', 'Protocol', 'Governance'].map(label => (
+                <button
+                  key={label}
+                  onClick={() => { scrollTo(label.toLowerCase()); setMobileMenuOpen(false); }}
+                  className="text-left px-3 py-2.5 text-sm font-medium text-slate-muted hover:text-slate-charcoal hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  {label}
+                </button>
+              ))}
+              <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
+                <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 text-sm font-medium text-slate-charcoal hover:bg-gray-50 rounded-lg transition-colors">Login</Link>
+                <Button asChild onClick={() => setMobileMenuOpen(false)} className="w-full justify-center">
+                  <Link to="/register">Get Started</Link>
+                </Button>
+              </div>
+            </nav>
+          </div>
+        )}
       </header>
 
       <main className="flex-1 flex flex-col gap-24 lg:gap-32 pb-20">

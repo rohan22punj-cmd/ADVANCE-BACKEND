@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ReceiptText, Copy, Check, Filter, ShieldCheck, ArrowUpRight, ArrowDownLeft, Info, Search, Calendar, DollarSign, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ReceiptText, Copy, Check, Filter, ShieldCheck, ArrowUpRight, ArrowDownLeft, Info, Search, Calendar, DollarSign, X, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
 import { useLedger } from '../App';
@@ -17,9 +17,10 @@ function TransactionCard({ transaction, selectedAccount, currentAccountObj, copy
   const isReversal = transaction.type === 'reversal';
   const counterpartyId = isOutgoing ? toAccId : fromAccId;
   const currency = currentAccountObj?.currency || 'INR';
+  const isFailed = transaction.status === 'failed';
 
   return (
-    <Card className="border-banking-border hover:bg-banking-bg transition-colors">
+    <Card className="border-banking-border hover:bg-banking-bg transition-colors relative group">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -75,6 +76,18 @@ function TransactionCard({ transaction, selectedAccount, currentAccountObj, copy
             <span>—</span>
           )}
         </div>
+
+        {isFailed && transaction.failureReason && (
+          <div className="absolute bottom-full left-0 right-0 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+            <div className="bg-slate-900 text-white text-xs px-3 py-2 rounded shadow-lg max-w-xs mx-auto whitespace-normal">
+              <div className="flex items-center gap-1.5 mb-1">
+                <AlertCircle size={12} className="text-debit" />
+                <span className="font-semibold">Failed</span>
+              </div>
+              <p className="text-slate-200">{transaction.failureReason}</p>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

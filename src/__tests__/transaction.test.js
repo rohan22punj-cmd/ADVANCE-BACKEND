@@ -92,7 +92,11 @@ describe('money-moving paths', () => {
         expect(response.status).toBe(400);
         expect(response.body.message).toMatch(/insufficient funds/i);
         expect(await Ledger.countDocuments({ account: destinationAccount._id })).toBe(0);
-        expect(await Transaction.countDocuments({ idempotencyKey: 'insufficient-funds-001' })).toBe(0);
+        // Now we expect a failed transaction record to be created
+        const failedTx = await Transaction.findOne({ idempotencyKey: 'insufficient-funds-001' });
+        expect(failedTx).toBeTruthy();
+        expect(failedTx.status).toBe('failed');
+        expect(failedTx.failureReason).toMatch(/insufficient funds/i);
     });
 
     test('blocks a duplicate idempotency key without duplicating ledger entries', async () => {

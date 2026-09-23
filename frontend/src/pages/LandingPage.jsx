@@ -135,8 +135,8 @@ export function LandingPage() {
               ))}
               <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
                 <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2.5 text-sm font-medium text-slate-charcoal hover:bg-gray-50 rounded-lg transition-colors">Login</Link>
-                <Button asChild onClick={() => setMobileMenuOpen(false)} className="w-full justify-center">
-                  <Link to="/register">Get Started</Link>
+                <Button onClick={() => { setMobileMenuOpen(false); navigate('/register'); }} className="w-full justify-center">
+                  Get Started
                 </Button>
               </div>
             </nav>
@@ -162,14 +162,13 @@ export function LandingPage() {
                 Enterprise-grade double-entry accounting paired with millisecond corporate treasury execution. Architected specifically for sovereign wealth, financial institutions, and global scale enterprises.
               </p>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 w-full sm:w-auto pt-2">
-                <Button asChild size="lg" className="h-12 px-6 flex items-center justify-center gap-2">
-                  <Link to="/register">Open an Account
-                    <span className="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
-                  </Link>
+                <Button size="lg" onClick={() => navigate('/register')} className="h-12 px-6 flex items-center justify-center gap-2">
+                  Open an Account
+                  <span className="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
                 </Button>
-                <Button variant="outline" asChild size="lg" className="h-12 px-6 flex items-center justify-center gap-2">
-                  <Link to="/register"><span className="material-symbols-outlined text-[18px] text-slate-muted" data-icon="terminal">terminal</span>
-                  Schedule Institutional Demo</Link>
+                <Button variant="outline" size="lg" onClick={() => navigate('/register')} className="h-12 px-6 flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-slate-muted" data-icon="terminal">terminal</span>
+                  Schedule Institutional Demo
                 </Button>
               </div>
               <div className="flex items-center gap-6 pt-4 text-xs font-medium text-slate-subtle border-t border-gray-200/80 w-full">

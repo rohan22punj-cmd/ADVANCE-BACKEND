@@ -11,6 +11,22 @@ function notify(send) {
     Promise.resolve().then(send).catch(() => undefined);
 }
 
+async function logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, reason, userId) {
+    try {
+        await transactionModel.create([{
+            fromAccount: fromAccountId,
+            toAccount: toAccountId,
+            amount: Number(amount),
+            status: 'failed',
+            idempotencyKey,
+            failureReason: reason
+        }]);
+    } catch (e) {
+        // If we can't even log the failure (e.g. duplicate idempotencyKey), just silently ignore
+        // The original error will still be returned to the client
+    }
+}
+
 /**
  * Account‑to‑Account Money Transfer
  * Executes a double‑entry financial transfer protected by Redis Distributed Locks and MongoDB ACID Transactions
@@ -23,16 +39,20 @@ async function createTransaction(req, res, next) {
     try {
         // 1. PRE‑DB INPUT VALIDATION
         if (!fromAccountId || !toAccountId || !amount || !idempotencyKey) {
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Missing required fields', req.user._id);
             return res.status(400).json({ message: "Missing required fields: fromAccountId, toAccountId, amount, and idempotencyKey are required" });
         }
         const numericAmount = Number(amount);
         if (isNaN(numericAmount) || numericAmount <= 0) {
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Invalid amount (must be positive number)', req.user._id);
             return res.status(400).json({ message: "Amount must be a positive number greater than zero" });
         }
         if (fromAccountId.toString() === toAccountId.toString()) {
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Cannot transfer to same account', req.user._id);
             return res.status(400).json({ message: "Cannot transfer funds to the same account" });
         }
         if (!mongoose.Types.ObjectId.isValid(fromAccountId) || !mongoose.Types.ObjectId.isValid(toAccountId)) {
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Invalid account ID format', req.user._id);
             return res.status(400).json({ message: "Invalid account ID format" });
         }
 
@@ -42,15 +62,18 @@ async function createTransaction(req, res, next) {
             return res.status(200).json({ message: "Transaction already processed (cached)", transaction: redisIdempotency.data ?.transaction || redisIdempotency.data });
         }
         if (redisIdempotency.status === 'IN_PROGRESS') {
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Duplicate idempotency key (in progress)', req.user._id);
             return res.status(409).json({ message: "A transaction with this idempotency key is currently being processed" });
         }
         const existingTransaction = await transactionModel.findOne({ idempotencyKey });
         if (existingTransaction) {
             await redisService.setIdempotencyCompleted(idempotencyKey, { transaction: existingTransaction });
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Duplicate idempotency key (already processed)', req.user._id);
             return res.status(409).json({ message: "Transaction already processed with this idempotency key", transaction: existingTransaction });
         }
         idempotencyClaimed = await redisService.setIdempotencyProcessing(idempotencyKey, 60);
         if (!idempotencyClaimed) {
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Duplicate idempotency key (concurrent)', req.user._id);
             return res.status(409).json({ message: "A transaction with this idempotency key is currently being processed" });
         }
 
@@ -59,6 +82,7 @@ async function createTransaction(req, res, next) {
         multiLock = await redisService.acquireMultiLock(accountLockKeys, 8000);
         if (!multiLock.acquired) {
             await redisService.clearIdempotency(idempotencyKey);
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Could not acquire lock (account busy)', req.user._id);
             return res.status(429).json({ message: "Accounts are currently processing another transaction. Please try again shortly." });
         }
 
@@ -67,27 +91,32 @@ async function createTransaction(req, res, next) {
         if (!fromAccount) {
             await multiLock.releaseAll();
             await redisService.clearIdempotency(idempotencyKey);
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Source account not found or not owned by user', req.user._id);
             return res.status(404).json({ message: "Source account not found or does not belong to you" });
         }
         if (fromAccount.status !== 'active') {
             await multiLock.releaseAll();
             await redisService.clearIdempotency(idempotencyKey);
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, `Source account is ${fromAccount.status}`, req.user._id);
             return res.status(400).json({ message: `Source account is ${fromAccount.status} and cannot initiate transfers` });
         }
         const toAccount = await accountModel.findById(toAccountId).populate('user', 'name email');
         if (!toAccount) {
             await multiLock.releaseAll();
             await redisService.clearIdempotency(idempotencyKey);
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Destination account not found', req.user._id);
             return res.status(404).json({ message: "Destination account not found" });
         }
         if (toAccount.status !== 'active') {
             await multiLock.releaseAll();
             await redisService.clearIdempotency(idempotencyKey);
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, `Destination account is ${toAccount.status}`, req.user._id);
             return res.status(400).json({ message: `Destination account is ${toAccount.status} and cannot receive transfers` });
         }
         if (fromAccount.currency !== toAccount.currency) {
             await multiLock.releaseAll();
             await redisService.clearIdempotency(idempotencyKey);
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, `Currency mismatch: ${fromAccount.currency} vs ${toAccount.currency}`, req.user._id);
             return res.status(400).json({ message: `Currency mismatch: source ${fromAccount.currency} vs destination ${toAccount.currency}` });
         }
 
@@ -103,6 +132,7 @@ async function createTransaction(req, res, next) {
             if (fromAccount.user ?.email) {
                 notify(() => emailService.failureNotificationEmail(fromAccount.user.email, fromAccount.user.name, `Insufficient funds. You attempted to send ${numericAmount} ${fromAccount.currency} but your balance is ${currentBalance} ${fromAccount.currency}.`));
             }
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, `Insufficient funds: balance ${currentBalance} < requested ${numericAmount}`, req.user._id);
             return res.status(400).json({ message: "Insufficient funds", currentBalance, requestedAmount: numericAmount, currency: fromAccount.currency });
         }
 
@@ -160,6 +190,8 @@ async function createTransaction(req, res, next) {
             if (fromAccount.user ?.email) {
                 notify(() => emailService.failureNotificationEmail(fromAccount.user.email, fromAccount.user.name, `Transaction failed: ${e.message}. Amount: ${numericAmount} ${fromAccount.currency}.`));
             }
+            // Log the in-session failure as a separate failed transaction
+            await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, e.message, req.user._id);
             throw e;
         }
     } catch (e) {

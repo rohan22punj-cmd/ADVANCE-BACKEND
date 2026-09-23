@@ -237,7 +237,7 @@ export function LandingPage() {
                     </div>
                     <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-slate-subtle">
                       <span className="flex items-center gap-1 font-mono text-[10px]"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>BLOCK: #8,419,203 [SHA-256 VALIDATED]</span>
-                      <span className="font-medium text-brand hover:underline cursor-pointer">Explore Explorer →</span>
+                      <NavLink to="/login" className="font-medium text-brand hover:underline cursor-pointer">Explore Explorer →</NavLink>
                     </div>
                   </div>
                 </div>

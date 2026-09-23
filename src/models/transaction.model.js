@@ -26,6 +26,10 @@ const transactionSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  failureReason: {
+    type: String,
+    trim: true,
+  },
 }, { timestamps: true });
 
 transactionSchema.index({ fromAccount: 1, createdAt: -1 });

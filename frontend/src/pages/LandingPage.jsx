@@ -350,14 +350,13 @@ export function LandingPage() {
               <p className="text-base text-slate-muted leading-relaxed">Equip your corporate treasury desk with mathematical certainty, sub-second clearing speeds, and comprehensive regulatory guarantees.</p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-3.5 pt-2 w-full sm:w-auto">
-              <Button asChild size="lg" className="w-full sm:w-auto h-12 px-7 flex items-center justify-center gap-2">
-                <Link to="/register">Open an Account Today
-                  <span className="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
-                </Link>
+              <Button size="lg" onClick={() => navigate('/register')} className="w-full sm:w-auto h-12 px-7 flex items-center justify-center gap-2">
+                Open an Account Today
+                <span className="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
               </Button>
-              <Button variant="outline" asChild size="lg" className="w-full sm:w-auto h-12 px-7 flex items-center justify-center gap-2">
-                <Link to="/register"><span className="material-symbols-outlined text-[18px]" data-icon="calendar_month">calendar_month</span>
-                Schedule Institutional Demo</Link>
+              <Button variant="outline" size="lg" onClick={() => navigate('/register')} className="w-full sm:w-auto h-12 px-7 flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-[18px]" data-icon="calendar_month">calendar_month</span>
+                Schedule Institutional Demo
               </Button>
             </div>
             <div className="text-xs text-slate-subtle mt-2 flex items-center gap-4"><span>• Fast-track corporate onboarding</span><span>• Dedicated API sandbox included</span><span>• No commitment required</span></div>

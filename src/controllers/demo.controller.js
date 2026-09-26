@@ -6,8 +6,6 @@ const User = require('../models/user.model');
 const { AppError } = require('../middleware/error.middleware');
 
 async function demoFundAccount(req, res, next) {
-    if (process.env.NODE_ENV === 'production') return next(new AppError('Not found', 404));
-
     try {
         const { accountId, amount = 1000 } = req.body;
         if (!accountId || !mongoose.Types.ObjectId.isValid(accountId)) {

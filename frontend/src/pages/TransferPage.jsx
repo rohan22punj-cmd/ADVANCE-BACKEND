@@ -369,13 +369,16 @@ export function TransferPage() {
                         }
                       }}
                       placeholder="Enter recipient account ID (24-char hex)"
-                      className="font-mono disabled:opacity-50"
+                      className={`font-mono disabled:opacity-50 ${form.toAccountId && form.fromAccountId && form.toAccountId.trim().toLowerCase() === form.fromAccountId.trim().toLowerCase() ? 'border-debit' : ''}`}
                     />
                     {lookupLoading && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs text-primary">
                         <Loader2 size={14} className="animate-spin" />
                         <span>Verifying...</span>
                       </div>
+                    )}
+                    {form.toAccountId && form.fromAccountId && form.toAccountId.trim().toLowerCase() === form.fromAccountId.trim().toLowerCase() && (
+                      <p className="text-xs text-debit mt-1">Cannot transfer to the same account</p>
                     )}
                   </div>
                   <p className="text-[11px] text-banking-textLight">Enter any account ID in the system. Recipient details will appear below for confirmation.</p>

@@ -1,4 +1,7 @@
-const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+let base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+if (!base) base = '/api';
+else if (!base.endsWith('/api')) base = `${base}/api`;
+const API_URL = base;
 
 const TOKEN_KEY = 'ledger_access_token';
 const USER_KEY = 'ledger_user';

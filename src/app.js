@@ -61,8 +61,9 @@ const authLimiter = rateLimit({
     message: {
         message: 'Too many auth requests from this IP, please try again after 15 minutes'
     },
-    standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
-    legacyHeaders: false, // Disable `X-RateLimit-*` headers
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.method === 'OPTIONS',
 });
 
 // General API rate limiter (more permissive)
@@ -74,6 +75,7 @@ const apiLimiter = rateLimit({
     },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.method === 'OPTIONS',
 });
 
 // Apply general rate limiting to all routes

@@ -47,7 +47,10 @@ async function createTransaction(req, res, next) {
             await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Invalid amount (must be positive number)', req.user._id);
             return res.status(400).json({ message: "Amount must be a positive number greater than zero" });
         }
-        if (fromAccountId.toString() === toAccountId.toString()) {
+        // Normalize IDs before comparison (trim whitespace, lowercase)
+        const normFrom = fromAccountId.toString().trim().toLowerCase();
+        const normTo = toAccountId.toString().trim().toLowerCase();
+        if (normFrom === normTo) {
             await logFailedTransaction(fromAccountId, toAccountId, amount, idempotencyKey, 'Cannot transfer to same account', req.user._id);
             return res.status(400).json({ message: "Cannot transfer funds to the same account" });
         }

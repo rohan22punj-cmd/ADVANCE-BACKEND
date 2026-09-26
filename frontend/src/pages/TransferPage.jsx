@@ -128,6 +128,12 @@ export function TransferPage() {
       toast.error('Insufficient funds in source account');
       return;
     }
+    // Client-side check: prevent same account transfer
+    if (form.fromAccountId && form.toAccountId && 
+        form.fromAccountId.trim().toLowerCase() === form.toAccountId.trim().toLowerCase()) {
+      toast.error('Cannot transfer funds to the same account');
+      return;
+    }
     // Validation before sending
     if (!form.toAccountId) {
       toast.error('Enter a destination account ID');

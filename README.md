@@ -179,14 +179,14 @@ npm test
 
 | Landing Page | Sign In |
 |---|---|
-| ![Landing](images/landing.png) | ![Auth](images/auth.png) |
+| ![Landing](images/landingPage.png) | ![Auth](images/loginPage.png) |
 
 | Dashboard | Transfer Funds |
 |---|---|
-| ![Dashboard](images/dashboard.png) | ![Transfer](images/transfer.png) |
+| ![Dashboard](images/account.png) | ![Transfer](images/transfer.png) |
 
 **Activity & Audit** — showing both completed and failed transactions, with full filtering (status, date range, amount, direction):
-![Activity Audit](images/activity-audit.png)
+![Activity Audit](images/hitory.png)
 
 ---
 
